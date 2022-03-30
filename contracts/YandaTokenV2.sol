@@ -197,7 +197,7 @@ contract YandaTokenV2 is Initializable, ERC20Upgradeable, AccessControlUpgradeab
         return false;
     }
 
-    function containsAddress(address[] memory array, address search) internal pure returns(bool) {
+    function _containsAddress(address[] memory array, address search) internal pure returns(bool) {
         for(uint x=0; x < array.length; x++) {
             if (array[x] == search) {
                 return true;
@@ -230,7 +230,7 @@ contract YandaTokenV2 is Initializable, ERC20Upgradeable, AccessControlUpgradeab
             index = random() % localTotalStaked;
             for(uint y=0; y < _services[service].validators.length; y++) {
                 if (_services[service].validators[y] != exclude1 && _services[service].validators[y] != exclude2) {
-                    if (containsAddress(result, _services[service].validators[y]) == false) {
+                    if (_containsAddress(result, _services[service].validators[y]) == false) {
                         if (index <= _stakesByValidators[_services[service].validators[y]]) {
                             result[x] = _services[service].validators[y];
                             localTotalStaked -= _stakesByValidators[_services[service].validators[y]];
@@ -311,7 +311,7 @@ contract YandaTokenV2 is Initializable, ERC20Upgradeable, AccessControlUpgradeab
 
     function setProcessCost(address customer, bytes32 productId, uint256 cost) public {
         require(_stakesByValidators[msg.sender] > 0, "Only validator with stakes can call this method");
-        require(containsAddress(_services[_processes[customer][productId].service].validators, msg.sender), "Your address is not whitelisted in the product service settings");
+        require(_containsAddress(_services[_processes[customer][productId].service].validators, msg.sender), "Your address is not whitelisted in the product service settings");
         require(_processes[customer][productId].state == State.AWAITING_COST, "Cost is already set, check the state");
         require(
             inTimeFrame(
@@ -373,7 +373,7 @@ contract YandaTokenV2 is Initializable, ERC20Upgradeable, AccessControlUpgradeab
 
     function validateTermination(address customer, bytes32 productId, bool result) public {
         require(_stakesByValidators[msg.sender] > 0, "Only validator with stakes can call this method");
-        require(containsAddress(_services[_processes[customer][productId].service].validators, msg.sender), "Your address is not whitelisted in the product service settings");
+        require(_containsAddress(_services[_processes[customer][productId].service].validators, msg.sender), "Your address is not whitelisted in the product service settings");
         require(_processes[customer][productId].state == State.AWAITING_VALIDATION, "Cannot accept validation, check the state");
         require(
             inTimeFrame(
@@ -434,7 +434,7 @@ contract YandaTokenV2 is Initializable, ERC20Upgradeable, AccessControlUpgradeab
         _stakes[msg.sender][validator].amount = _stakes[msg.sender][validator].amount.add(amount);
         _stakes[msg.sender][validator].unlockingBlock = block.number + _lockingPeriod;
         _stakesByValidators[validator] = _stakesByValidators[validator].add(amount);
-        if (alreadyStaked == false && containsAddress(_validatorStakers[validator], msg.sender) == false) {
+        if (alreadyStaked == false && _containsAddress(_validatorStakers[validator], msg.sender) == false) {
             _validatorStakers[validator].push(msg.sender);
         }
         emit Staked(msg.sender, validator, amount, _stakes[msg.sender][validator].unlockingBlock);
