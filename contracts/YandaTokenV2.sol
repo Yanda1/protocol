@@ -161,6 +161,10 @@ contract YandaTokenV2 is Initializable, ERC20Upgradeable, AccessControlUpgradeab
         _services[msg.sender].validators = vList;
     }
 
+    function getValidatorVer(address service) public view returns(uint) {
+        return _services[service].validatorVersion;
+    }
+
     function setValidatorVer(uint vVer) public onlyService {
         _services[msg.sender].validatorVersion = vVer;
     }
