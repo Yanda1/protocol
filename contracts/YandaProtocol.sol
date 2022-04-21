@@ -135,13 +135,14 @@ contract YandaProtocol is Initializable, AccessControlUpgradeable {
     }
 
     function deposit(uint256 amount) external {
-        require(_processes[msg.sender][_depositingProducts[msg.sender]].state == State.AWAITING_TRANSFER, "You don't have a deposit awaiting process, please create it first");
-        require(_processes[msg.sender][_depositingProducts[msg.sender]].cost == amount, "Deposit amount doesn't match with the requested cost");
+        Process storage process = _processes[msg.sender][_depositingProducts[msg.sender]];
+        require(process.state == State.AWAITING_TRANSFER, "You don't have a deposit awaiting process, please create it first");
+        require(process.cost == amount, "Deposit amount doesn't match with the requested cost");
 
         bool success = _tokenContract.transferFrom(_msgSender(), address(this), amount);
         if(success) {
-            _processes[msg.sender][_depositingProducts[msg.sender]].state = State.AWAITING_TERMINATION;
-            emit Deposit(_msgSender(), _processes[msg.sender][_depositingProducts[msg.sender]].service, _processes[msg.sender][_depositingProducts[msg.sender]].productId, amount);
+            process.state = State.AWAITING_TERMINATION;
+            emit Deposit(_msgSender(), process.service, process.productId, amount);
         } else {
             revert("Wasn't able to transfer your token");
         }
@@ -300,46 +301,47 @@ contract YandaProtocol is Initializable, AccessControlUpgradeable {
 
     function setProcessCost(address customer, bytes32 productId, uint256 cost) external {
         require(_stakesByValidators[msg.sender] > 0, "Only validator with stakes can call this method");
-        require(_containsAddress(_services[_processes[customer][productId].service].validators, msg.sender), "Your address is not whitelisted in the product service settings");
-        require(_processes[customer][productId].state == State.AWAITING_COST, "Cost is already set, check the state");
+        Process storage process = _processes[customer][productId];
+        require(_containsAddress(_services[process.service].validators, msg.sender), "Your address is not whitelisted in the product service settings");
+        require(process.state == State.AWAITING_COST, "Cost is already set, check the state");
         require(
             inTimeFrame(
-                _processes[customer][productId].validatorsList,
+                process.validatorsList,
                 msg.sender,
-                _processes[customer][productId].startBlock,
+                process.startBlock,
                 TIME_FRAME_SIZE
             ),
             "Cannot accept validation, you are out of time"
         );
 
-        if(_processes[customer][productId].firstValidator == address(0)) {
-            _processes[customer][productId].firstValidator = msg.sender;
-            _processes[customer][productId].cost = cost;
-            _processes[customer][productId].startBlock = block.number;
-            _processes[customer][productId].validatorsList = _randValidatorsList(_processes[customer][productId].service, _processes[customer][productId].firstValidator, address(0));
-            emit CostRequest(customer, _processes[customer][productId].service, productId, _processes[customer][productId].validatorsList, _processes[customer][productId].productData);
-        } else if(_processes[customer][productId].secondValidator == address(0)) {
-            _processes[customer][productId].secondValidator = msg.sender;
-            _processes[customer][productId].costConf = cost;
-            if(_processes[customer][productId].cost == _processes[customer][productId].costConf) {
-                _processes[customer][productId].state = State.AWAITING_TRANSFER;
-                emit CostResponse(customer, _processes[customer][productId].service, productId, cost);
+        if(process.firstValidator == address(0)) {
+            process.firstValidator = msg.sender;
+            process.cost = cost;
+            process.startBlock = block.number;
+            process.validatorsList = _randValidatorsList(process.service, process.firstValidator, address(0));
+            emit CostRequest(customer, process.service, productId, process.validatorsList, process.productData);
+        } else if(process.secondValidator == address(0)) {
+            process.secondValidator = msg.sender;
+            process.costConf = cost;
+            if(process.cost == process.costConf) {
+                process.state = State.AWAITING_TRANSFER;
+                emit CostResponse(customer, process.service, productId, cost);
             } else {
-                _processes[customer][productId].startBlock = block.number;
-                _processes[customer][productId].validatorsList = _randValidatorsList(_processes[customer][productId].service, _processes[customer][productId].firstValidator, _processes[customer][productId].secondValidator);
-                emit CostRequest(customer, _processes[customer][productId].service, productId, _processes[customer][productId].validatorsList, _processes[customer][productId].productData);
+                process.startBlock = block.number;
+                process.validatorsList = _randValidatorsList(process.service, process.firstValidator, process.secondValidator);
+                emit CostRequest(customer, process.service, productId, process.validatorsList, process.productData);
             }
         } else {
-            if(_processes[customer][productId].cost == cost) {
-                _processes[customer][productId].secondValidator = msg.sender;
-                _processes[customer][productId].costConf = cost;
+            if(process.cost == cost) {
+                process.secondValidator = msg.sender;
+                process.costConf = cost;
             } else {
-                _processes[customer][productId].firstValidator = msg.sender;
-                _processes[customer][productId].cost = cost;
+                process.firstValidator = msg.sender;
+                process.cost = cost;
             }
-            _processes[customer][productId].cost = cost;
-            _processes[customer][productId].state = State.AWAITING_TRANSFER;
-            emit CostResponse(customer, _processes[customer][productId].service, productId, cost);
+            process.cost = cost;
+            process.state = State.AWAITING_TRANSFER;
+            emit CostResponse(customer, process.service, productId, cost);
         }
     }
 
@@ -349,65 +351,68 @@ contract YandaProtocol is Initializable, AccessControlUpgradeable {
 
     function startTermination(address customer, bytes32 productId) external {
         require((_services[msg.sender].validationPerc > 0) || (msg.sender == customer), "Only service or product customer can call this method");
-        require(_processes[customer][productId].state == State.AWAITING_TERMINATION, "Cannot start termination, check the state");
-        _processes[customer][productId].state = State.AWAITING_VALIDATION;
-        _processes[customer][productId].startBlock = block.number;
-        _processes[customer][productId].validatorsList = _randValidatorsList(_processes[customer][productId].service, address(0), address(0));
-        _processes[customer][productId].firstValidator = address(0);
-        _processes[customer][productId].firstResult = false;
-        _processes[customer][productId].secondValidator = address(0);
-        _processes[customer][productId].secondResult = false;
-        emit Terminate(customer, msg.sender, productId, _processes[customer][productId].validatorsList);
+        Process storage process = _processes[customer][productId];
+        require(process.state == State.AWAITING_TERMINATION, "Cannot start termination, check the state");
+
+        process.state = State.AWAITING_VALIDATION;
+        process.startBlock = block.number;
+        process.validatorsList = _randValidatorsList(process.service, address(0), address(0));
+        process.firstValidator = address(0);
+        process.firstResult = false;
+        process.secondValidator = address(0);
+        process.secondResult = false;
+        emit Terminate(customer, msg.sender, productId, process.validatorsList);
     }
 
     function validateTermination(address customer, bytes32 productId, bool result) external {
         require(_stakesByValidators[msg.sender] > 0, "Only validator with stakes can call this method");
-        require(_containsAddress(_services[_processes[customer][productId].service].validators, msg.sender), "Your address is not whitelisted in the product service settings");
-        require(_processes[customer][productId].state == State.AWAITING_VALIDATION, "Cannot accept validation, check the state");
+        Process storage process = _processes[customer][productId];
+        require(_containsAddress(_services[process.service].validators, msg.sender), "Your address is not whitelisted in the product service settings");
+        require(process.state == State.AWAITING_VALIDATION, "Cannot accept validation, check the state");
         require(
             inTimeFrame(
-                _processes[customer][productId].validatorsList,
+                process.validatorsList,
                 msg.sender,
-                _processes[customer][productId].startBlock,
+                process.startBlock,
                 TIME_FRAME_SIZE
             ),
             "Cannot accept validation, you are out of time"
         );
 
-        if(_processes[customer][productId].firstValidator == address(0)) {
-            _processes[customer][productId].firstValidator = msg.sender;
-            _processes[customer][productId].firstResult = result;
-            _processes[customer][productId].startBlock = block.number;
-            _processes[customer][productId].validatorsList = _randValidatorsList(_processes[customer][productId].service, _processes[customer][productId].firstValidator, address(0));
-            emit Terminate(customer, _processes[customer][productId].service, productId, _processes[customer][productId].validatorsList);
-        } else if(_processes[customer][productId].secondValidator == address(0)) {
-            _processes[customer][productId].secondValidator = msg.sender;
-            _processes[customer][productId].secondResult = result;
-            if(_processes[customer][productId].firstResult == _processes[customer][productId].secondResult) {
-                _makePayouts(customer, productId, !_processes[customer][productId].firstResult, 0);
-                _processes[customer][productId].state = State.COMPLETED;
-                emit Complete(customer, _processes[customer][productId].service, productId, _processes[customer][productId].firstResult);
+        if(process.firstValidator == address(0)) {
+            process.firstValidator = msg.sender;
+            process.firstResult = result;
+            process.startBlock = block.number;
+            process.validatorsList = _randValidatorsList(process.service, process.firstValidator, address(0));
+            emit Terminate(customer, process.service, productId, process.validatorsList);
+        } else if(process.secondValidator == address(0)) {
+            process.secondValidator = msg.sender;
+            process.secondResult = result;
+            if(process.firstResult == process.secondResult) {
+                _makePayouts(customer, productId, !process.firstResult, 0);
+                process.state = State.COMPLETED;
+                emit Complete(customer, process.service, productId, process.firstResult);
             } else {
-                _processes[customer][productId].startBlock = block.number;
-                _processes[customer][productId].validatorsList = _randValidatorsList(_processes[customer][productId].service, _processes[customer][productId].firstValidator, _processes[customer][productId].secondValidator);
-                emit Terminate(customer, _processes[customer][productId].service, productId, _processes[customer][productId].validatorsList);
+                process.startBlock = block.number;
+                process.validatorsList = _randValidatorsList(process.service, process.firstValidator, process.secondValidator);
+                emit Terminate(customer, process.service, productId, process.validatorsList);
             }
         } else {
-            if(_processes[customer][productId].firstResult == result) {
-                uint256 penalty = _stakesByValidators[_processes[customer][productId].secondValidator].mul(_penaltyPerc).div(100);
-                uint256 appliedPenalty = _penalizeLoop(_processes[customer][productId].secondValidator, penalty);
-                _processes[customer][productId].secondValidator = msg.sender;
-                _processes[customer][productId].secondResult = result;
-                _makePayouts(customer, productId, !_processes[customer][productId].firstResult, appliedPenalty);
+            if(process.firstResult == result) {
+                uint256 penalty = _stakesByValidators[process.secondValidator].mul(_penaltyPerc).div(100);
+                uint256 appliedPenalty = _penalizeLoop(process.secondValidator, penalty);
+                process.secondValidator = msg.sender;
+                process.secondResult = result;
+                _makePayouts(customer, productId, !process.firstResult, appliedPenalty);
             } else {
-                uint256 penalty = _stakesByValidators[_processes[customer][productId].firstValidator].mul(_penaltyPerc).div(100);
-                uint256 appliedPenalty = _penalizeLoop(_processes[customer][productId].firstValidator, penalty);
-                _processes[customer][productId].firstValidator = msg.sender;
-                _processes[customer][productId].firstResult = result;
-                _makePayouts(customer, productId, !_processes[customer][productId].firstResult, appliedPenalty);
+                uint256 penalty = _stakesByValidators[process.firstValidator].mul(_penaltyPerc).div(100);
+                uint256 appliedPenalty = _penalizeLoop(process.firstValidator, penalty);
+                process.firstValidator = msg.sender;
+                process.firstResult = result;
+                _makePayouts(customer, productId, !process.firstResult, appliedPenalty);
             }
-            _processes[customer][productId].state = State.COMPLETED;
-            emit Complete(customer, _processes[customer][productId].service, productId, _processes[customer][productId].firstResult);
+            process.state = State.COMPLETED;
+            emit Complete(customer, process.service, productId, process.firstResult);
         }
     }
 
