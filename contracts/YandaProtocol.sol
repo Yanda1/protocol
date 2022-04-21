@@ -148,6 +148,9 @@ contract YandaProtocol is Initializable, AccessControlUpgradeable {
     }
 
     function addService(address service, address[] memory vList, uint vPerc, uint cPerc, uint vVer) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        require(vList.length > 2, "Validators minimum quantity is 3");
+        require(vPerc > 0, "Validators reward share should be major than 0%");
+        require(vPerc + cPerc <= 100, "Sum of validators reward and service comission should be minor or equal to 100%");
         _services[service] = Service({validators: vList, validationPerc: vPerc, commissionPerc: cPerc, validatorVersion: vVer});
     }
 
