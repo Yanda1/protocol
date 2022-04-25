@@ -1,5 +1,14 @@
 const { expect } = require("chai");
 const { ethers, upgrades } = require("hardhat");
+const { getTxReceipt } = require("../utils/getTxReceipt");
+
+
+async function getValidatorFromTx(contract, tx) {
+  const receipt = await getTxReceipt(tx);
+  const costRequestEvents = receipt.logs.map((log) => contract.interface.parseLog(log));
+  const selectedValidator = costRequestEvents[costRequestEvents.length-1].args.validatorsList[0];
+  return selectedValidator;
+}
 
 function getValidatorIndex(accounts, selectedAddr) {
   for (let i = 2; i < 5; i++) {
@@ -9,7 +18,7 @@ function getValidatorIndex(accounts, selectedAddr) {
   }
 }
 
-describe("YandaTokenV2 Test", function () {
+describe("YandaProtocol Test", function () {
   let accounts;
   let token;
   let protocol;
@@ -25,33 +34,43 @@ describe("YandaTokenV2 Test", function () {
     const Protocol = await ethers.getContractFactory("YandaProtocol");
     protocol = await upgrades.deployProxy(Protocol, [10, 51840, token.address]);
     await protocol.deployed();
+
     // Add new service with the admin address of accounts[1] and as validators accounts[2,3,4]
     await protocol.addService(accounts[1].address, accounts.map(x => x.address).slice(2, 5), 33, 33, 9);
-  });
 
-  it("Create new service and product, declare actions and terminate", async function () {
+    // Transfer 1 YandaToken from token owner to customer account(accounts[5])
+    await token.transfer(accounts[5].address, ethers.utils.parseEther('1'));
     // Transfer 10 YandaToken from token owner to the first validator(accounts[2])
     await token.transfer(accounts[2].address, ethers.utils.parseEther('10'));
     // Transfer 20 YandaToken from token owner to the second validator(accounts[3])
     await token.transfer(accounts[3].address, ethers.utils.parseEther('20'));
     // Transfer 30 YandaToken from token owner to the third validator(accounts[4])
     await token.transfer(accounts[4].address, ethers.utils.parseEther('30'));
-    // Transfer 1 YandaToken from token owner to customer account(accounts[5])
-    await token.transfer(accounts[5].address, ethers.utils.parseEther('1'));
 
-    // Stake 10 YandaToken from the first validator(accounts[2])
     var stakeAmount = ethers.utils.parseEther('10');
-    await token.connect(accounts[2]).approve(protocol.address, stakeAmount);
+    var tx = await token.connect(accounts[2]).approve(protocol.address, stakeAmount);
+    // Wait until the transaction is mined
+    var result = await getTxReceipt(tx);
+    // Stake 10 YandaToken from the first validator(accounts[2])
     await protocol.connect(accounts[2]).stake(accounts[2].address, stakeAmount);
-    // Stake 20 YandaToken from the second validator(accounts[3])
     stakeAmount = ethers.utils.parseEther('20');
-    await token.connect(accounts[3]).approve(protocol.address, stakeAmount);
+    tx = await token.connect(accounts[3]).approve(protocol.address, stakeAmount);
+    // Wait until the transaction is mined
+    result = await getTxReceipt(tx);
+    // Stake 20 YandaToken from the second validator(accounts[3])
     await protocol.connect(accounts[3]).stake(accounts[3].address, stakeAmount);
-    // Stake 30 YandaToken from the third validator(accounts[4])
     stakeAmount = ethers.utils.parseEther('30');
-    await token.connect(accounts[4]).approve(protocol.address, stakeAmount);
+    tx = await token.connect(accounts[4]).approve(protocol.address, stakeAmount);
+    // Wait until the transaction is mined
+    result = await getTxReceipt(tx);
+    // Stake 30 YandaToken from the third validator(accounts[4])
     await protocol.connect(accounts[4]).stake(accounts[4].address, stakeAmount);
+    result = await getTxReceipt(tx);
+    console.log('');
+  });
 
+
+  it("Create new service and product, declare actions and terminate", async function () {
     // Confirm account #5 balance is equal to 1 YND
     let balance = await token.balanceOf(accounts[5].address);
     expect(ethers.utils.formatEther(balance)).to.equal('1.0');
@@ -60,8 +79,7 @@ describe("YandaTokenV2 Test", function () {
     const newProcessTx = await protocol.connect(accounts[5]).createProcess(accounts[1].address, ethers.utils.id('123'), '{"a": 1, "b": 2, "c": 3}');
 
     // Retreive validators rand list from the logs
-    let costRequestEvents = await protocol.queryFilter('CostRequest');
-    var selectedValidator = costRequestEvents[costRequestEvents.length-1].args.validatorsList[0];
+    var selectedValidator = await getValidatorFromTx(protocol, newProcessTx);
     var firstIndex = getValidatorIndex(accounts, selectedValidator);
     
     console.log(`Selected validator accounts[${firstIndex}]`)
@@ -70,8 +88,7 @@ describe("YandaTokenV2 Test", function () {
     console.log('Calulated cost is 1 YND')
 
     // Retreive validators rand list from the logs
-    costRequestEvents = await protocol.queryFilter('CostRequest');
-    selectedValidator = costRequestEvents[costRequestEvents.length-1].args.validatorsList[0];
+    selectedValidator = await getValidatorFromTx(protocol, setCostTx);
     var secondIndex = getValidatorIndex(accounts, selectedValidator);
 
     console.log(`Selected validator accounts[${secondIndex}]`)
@@ -83,8 +100,10 @@ describe("YandaTokenV2 Test", function () {
     
     // Make smart contract deposit from account #5
     const depositAmount = ethers.utils.parseEther('1');
-    await token.connect(accounts[5]).approve(protocol.address, depositAmount);
-    await protocol.connect(accounts[5]).deposit(depositAmount);
+    tx = await token.connect(accounts[5]).approve(protocol.address, depositAmount);
+    result = await getTxReceipt(tx);
+    tx = await protocol.connect(accounts[5]).deposit(depositAmount);
+    result = await getTxReceipt(tx);
 
     // Check contract balance
     const balanceAfter = await token.balanceOf(protocol.address);
@@ -98,8 +117,7 @@ describe("YandaTokenV2 Test", function () {
     const terminateTx = await protocol.connect(accounts[5]).startTermination(accounts[5].address, ethers.utils.id('123'));
 
     // Retreive validators rand list from the logs
-    let terminateEvents = await protocol.queryFilter('Terminate');
-    selectedValidator = terminateEvents[terminateEvents.length-1].args.validatorsList[0];
+    selectedValidator = await getValidatorFromTx(protocol, terminateTx);
     firstIndex = getValidatorIndex(accounts, selectedValidator);
     
     console.log(`Selected validator accounts[${firstIndex}]`)
@@ -108,14 +126,15 @@ describe("YandaTokenV2 Test", function () {
     console.log('Validated with "true"');
 
     // Retreive validators rand list from the logs
-    terminateEvents = await protocol.queryFilter('Terminate');
-    selectedValidator = terminateEvents[terminateEvents.length-1].args.validatorsList[0];
+    selectedValidator = await getValidatorFromTx(protocol, validateTerminationTx);
     secondIndex = getValidatorIndex(accounts, selectedValidator);
 
     console.log(`Selected validator accounts[${secondIndex}]`)
     // Second validation of the productId "123" for client accounts[5]
-    await protocol.connect(accounts[secondIndex]).validateTermination(accounts[5].address, ethers.utils.id('123'), true);
+    tx = await protocol.connect(accounts[secondIndex]).validateTermination(accounts[5].address, ethers.utils.id('123'), true);
     console.log('Validated with "true"');
+    // Confirm that transaction was minted
+    var result = await getTxReceipt(tx);
 
     // Confirm that process state == COMPLETED
     result = await protocol.getProcess(accounts[5].address, ethers.utils.id('123'));
@@ -132,28 +151,6 @@ describe("YandaTokenV2 Test", function () {
   });
 
   it("Penalize one of the validators", async function () {
-    // Transfer 10 YandaToken from token owner to the first validator(accounts[2])
-    await token.transfer(accounts[2].address, ethers.utils.parseEther('10'));
-    // Transfer 20 YandaToken from token owner to the second validator(accounts[3])
-    await token.transfer(accounts[3].address, ethers.utils.parseEther('20'));
-    // Transfer 30 YandaToken from token owner to the third validator(accounts[4])
-    await token.transfer(accounts[4].address, ethers.utils.parseEther('30'));
-    // Transfer 1 YandaToken from token owner to customer account(accounts[5])
-    await token.transfer(accounts[5].address, ethers.utils.parseEther('1'));
-
-    // Stake 10 YandaToken from the first validator(accounts[2])
-    var stakeAmount = ethers.utils.parseEther('10');
-    await token.connect(accounts[2]).approve(protocol.address, stakeAmount);
-    await protocol.connect(accounts[2]).stake(accounts[2].address, stakeAmount);
-    // Stake 20 YandaToken from the second validator(accounts[3])
-    stakeAmount = ethers.utils.parseEther('20');
-    await token.connect(accounts[3]).approve(protocol.address, stakeAmount);
-    await protocol.connect(accounts[3]).stake(accounts[3].address, stakeAmount);
-    // Stake 30 YandaToken from the third validator(accounts[4])
-    stakeAmount = ethers.utils.parseEther('30');
-    await token.connect(accounts[4]).approve(protocol.address, stakeAmount);
-    await protocol.connect(accounts[4]).stake(accounts[4].address, stakeAmount);
-
     // Confirm account #5 balance is equal to 1 YND
     let balance = await token.balanceOf(accounts[5].address);
     expect(ethers.utils.formatEther(balance)).to.equal('1.0');
@@ -162,8 +159,7 @@ describe("YandaTokenV2 Test", function () {
     const newProcessTx = await protocol.connect(accounts[5]).createProcess(accounts[1].address, ethers.utils.id('123'), '{"a": 1, "b": 2, "c": 3}');
 
     // Retreive validators rand list from the logs
-    let costRequestEvents = await protocol.queryFilter('CostRequest');
-    var selectedValidator = costRequestEvents[costRequestEvents.length-1].args.validatorsList[0];
+    var selectedValidator = await getValidatorFromTx(protocol, newProcessTx);
     var firstIndex = getValidatorIndex(accounts, selectedValidator);
     
     console.log(`Selected validator accounts[${firstIndex}]`)
@@ -172,8 +168,7 @@ describe("YandaTokenV2 Test", function () {
     console.log('Calulated cost is 2 YND')
 
     // Retreive validators rand list from the logs
-    costRequestEvents = await protocol.queryFilter('CostRequest');
-    selectedValidator = costRequestEvents[costRequestEvents.length-1].args.validatorsList[0];
+    selectedValidator = await getValidatorFromTx(protocol, setCostTx);
     var secondIndex = getValidatorIndex(accounts, selectedValidator);
 
     console.log(`Selected validator accounts[${secondIndex}]`)
@@ -182,8 +177,7 @@ describe("YandaTokenV2 Test", function () {
     console.log('Calulated cost is 1 YND')
 
     // Retreive validators rand list from the logs
-    costRequestEvents = await protocol.queryFilter('CostRequest');
-    selectedValidator = costRequestEvents[costRequestEvents.length-1].args.validatorsList[0];
+    selectedValidator = await getValidatorFromTx(protocol, setCostTx);
     var thirdIndex = getValidatorIndex(accounts, selectedValidator);
 
     console.log(`Selected validator accounts[${thirdIndex}]`)
@@ -193,7 +187,9 @@ describe("YandaTokenV2 Test", function () {
     
     // Make smart contract deposit from account #5
     const depositAmount = ethers.utils.parseEther('1');
-    await token.connect(accounts[5]).approve(protocol.address, depositAmount);
+    var tx = await token.connect(accounts[5]).approve(protocol.address, depositAmount);
+    // Wait until the transaction is mined
+    var result = await getTxReceipt(tx);
     await protocol.connect(accounts[5]).deposit(depositAmount);
 
     // Declare few service produced actions
@@ -204,8 +200,7 @@ describe("YandaTokenV2 Test", function () {
     const terminateTx = await protocol.connect(accounts[5]).startTermination(accounts[5].address, ethers.utils.id('123'));
 
     // Retreive validators rand list from the logs
-    let terminateEvents = await protocol.queryFilter('Terminate');
-    selectedValidator = terminateEvents[terminateEvents.length-1].args.validatorsList[0];
+    selectedValidator = await getValidatorFromTx(protocol, terminateTx);
     firstIndex = getValidatorIndex(accounts, selectedValidator);
     
     let stakedBefore = await protocol.stakeOf(accounts[firstIndex].address, accounts[firstIndex].address);
@@ -216,8 +211,7 @@ describe("YandaTokenV2 Test", function () {
     console.log('Validated with false');
 
     // Retreive validators rand list from the logs
-    terminateEvents = await protocol.queryFilter('Terminate');
-    selectedValidator = terminateEvents[terminateEvents.length-1].args.validatorsList[0];
+    selectedValidator = await getValidatorFromTx(protocol, validateTerminationTx);
     secondIndex = getValidatorIndex(accounts, selectedValidator);
 
     console.log(`Selected validator accounts[${secondIndex}]`)
@@ -226,14 +220,15 @@ describe("YandaTokenV2 Test", function () {
     console.log('Validated with "true"');
 
     // Retreive validators rand list from the logs
-    terminateEvents = await protocol.queryFilter('Terminate');
-    selectedValidator = terminateEvents[terminateEvents.length-1].args.validatorsList[0];
+    selectedValidator = await getValidatorFromTx(protocol, validateTerminationTx);
     thirdIndex = getValidatorIndex(accounts, selectedValidator);
 
     console.log(`Selected validator accounts[${thirdIndex}]`)
     // Third validation of the productId "123" for client accounts[5]
-    await protocol.connect(accounts[thirdIndex]).validateTermination(accounts[5].address, ethers.utils.id('123'), true);
+    tx = await protocol.connect(accounts[thirdIndex]).validateTermination(accounts[5].address, ethers.utils.id('123'), true);
     console.log('Validated with "true"');
+    // Wait until the transaction is mined
+    result = await getTxReceipt(tx);
 
     // Check penilized validator balance, is should be 10% less than it was before
     let stakedAfter = await protocol.stakeOf(accounts[firstIndex].address, accounts[firstIndex].address);
