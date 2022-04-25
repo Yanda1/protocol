@@ -5,8 +5,6 @@ import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol"
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "./celo_randomness/IRandom.sol";
-import "./celo_randomness/IRegistry.sol";
 
 
 contract YandaProtocol is Initializable, AccessControlUpgradeable {
@@ -196,11 +194,9 @@ contract YandaProtocol is Initializable, AccessControlUpgradeable {
     }
 
     function random() internal view returns(uint256) {
-        bytes32 randomness = IRandom(
-            IRegistry(0x000000000000000000000000000000000000ce10)
-                .getAddressFor(keccak256(abi.encodePacked("Random")))
-        ).random();
-        return uint256(randomness);
+        // Temp solution with fake random
+        // TODO resolve with real randomness
+        return uint256(keccak256(abi.encodePacked(block.difficulty, block.timestamp)));
     }
 
     function _randValidatorsList(address service, address exclude1, address exclude2) internal view returns(address[] memory) {
