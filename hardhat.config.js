@@ -2,59 +2,45 @@
  * @type import('hardhat/config').HardhatUserConfig
  */
 require('@openzeppelin/hardhat-upgrades');
-require("@nomiclabs/hardhat-waffle");
+require("@nomiclabs/hardhat-ethers");
 require('dotenv').config({path: '.env'});
 require('hardhat-contract-sizer');
 
 // You need to export an object to set up your config
 // Go to https://hardhat.org/config/ to learn more
 
-// Prints the Celo accounts associated with the mnemonic in .env
-task("accounts", "Prints the list of accounts", async (taskArgs, hre) => {
-  const accounts = await hre.ethers.getSigners();
 
-  for (const account of accounts) {
-    console.log(account.address);
-  }
-});
+// Import your private key from your pre-funded Moonbase Alpha testing accounts
+const { privateKeys } = require('./dev_secrets.json');
 
 /**
  * @type import('hardhat/config').HardhatUserConfig
  */
 module.exports = {
-  // defaultNetwork: "localhost",
   networks: {
-    localhost: {
-        url: "http://127.0.0.1:8545"
+    moonbeam_dev: {
+      url: 'http://127.0.0.1:9933',
+      chainId: 1281, // (hex: 0x501),
+      accounts: privateKeys
     },
-    alfajores: {
-      url: "https://alfajores-forno.celo-testnet.org",
-      accounts: {
-        mnemonic: process.env.MNEMONIC,
-        path: "m/44'/52752'/0'/0"
-      },
-      chainId: 44787
-    },
-    celo: {
-      url: "https://forno.celo.org",
-      accounts: {
-        mnemonic: process.env.MNEMONIC,
-        path: "m/44'/52752'/0'/0"
-      },
-      chainId: 42220
-    },     
+    // moonbase: {
+    //   url: 'https://rpc.api.moonbase.moonbeam.network',
+    //   chainId: 1287, // (hex: 0x507),
+    //   accounts: [process.env.PRIVATE_KEY]
+    // },
+    // moonriver: {
+    //   url: 'RPC-API-ENDPOINT-HERE', // Insert your RPC URL here
+    //   chainId: 1285, // (hex: 0x505),
+    //   accounts: [process.env.PRIVATE_KEY]
+    // },
+    // moonbeam: {
+    //   url: 'RPC-API-ENDPOINT-HERE', // Insert your RPC URL here
+    //   chainId: 1284, // (hex: 0x504),
+    //   accounts: [process.env.PRIVATE_KEY]
+    // },
   },
   solidity: {
     compilers: [
-      {
-        version: "0.5.13",
-        settings: {
-          optimizer: {
-            enabled: true,
-            runs: 1,
-          },
-        },
-      },
       {
         version: "0.8.3",
         settings: {
@@ -65,16 +51,8 @@ module.exports = {
         },
       },
     ],
-    overrides: {
-      // "contracts/YandaTokenV2.sol": {
-      //   version: "0.8.3",
-      // },
-      "@celo/contracts/common/interfaces/IRegistry.sol": {
-        version: "0.5.13",
-      },
-      "@celo/contracts/identity/interfaces/IRandom.sol": {
-        version: "0.5.13",
-      }
-    }
   },
+  mocha: {
+    timeout: 60000
+  }
 };
