@@ -12,11 +12,11 @@ describe("YandaGovernor Test", function () {
     accounts = await ethers.getSigners();
     // Deploy YandaToken
     const Token = await ethers.getContractFactory("YandaTokenV2");
-    const token = await upgrades.deployProxy(Token);
+    token = await upgrades.deployProxy(Token);
     await token.deployed();
     // Deploy YandaProtocol
     const Protocol = await ethers.getContractFactory("YandaProtocol");
-    const protocol = await upgrades.deployProxy(Protocol, [10, 51840, token.address]);
+    protocol = await upgrades.deployProxy(Protocol, [10, 51840, token.address]);
     await protocol.deployed();
     // Deploy YandaGovernor with YandaToken address as argument
     const Governor = await ethers.getContractFactory("YandaGovernor");

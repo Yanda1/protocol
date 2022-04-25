@@ -8,7 +8,7 @@ async function main() {
   // Protocol contract args: penaltyPerc=10, lockingPeriod=51840 (3 days in 5 sec block's amount)
   const Protocol = await ethers.getContractFactory("YandaProtocol");
   const protocol = await upgrades.deployProxy(Protocol, [10, 51840, token.address]);
-  await token.deployed();
+  await protocol.deployed();
   // Deploy YandaGovernor with YandaToken address as argument
   const Governor = await ethers.getContractFactory("YandaGovernor");
   const governor = await Governor.deploy(token.address, 5, 5, ethers.utils.parseEther('1000'), [4, 25, 50]);

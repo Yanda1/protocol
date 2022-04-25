@@ -19,11 +19,11 @@ describe("YandaTokenV2 Test", function () {
     accounts = await ethers.getSigners();
     // Deploy YandaToken
     const Token = await ethers.getContractFactory("YandaTokenV2");
-    const token = await upgrades.deployProxy(Token);
+    token = await upgrades.deployProxy(Token);
     await token.deployed();
     // Deploy YandaProtocol
     const Protocol = await ethers.getContractFactory("YandaProtocol");
-    const protocol = await upgrades.deployProxy(Protocol, [10, 51840, token.address]);
+    protocol = await upgrades.deployProxy(Protocol, [10, 51840, token.address]);
     await protocol.deployed();
     // Add new service with the admin address of accounts[1] and as validators accounts[2,3,4]
     await protocol.addService(accounts[1].address, accounts.map(x => x.address).slice(2, 5), 33, 33, 9);
@@ -235,9 +235,11 @@ describe("YandaTokenV2 Test", function () {
     await protocol.connect(accounts[thirdIndex]).validateTermination(accounts[5].address, ethers.utils.id('123'), true);
     console.log('Validated with "true"');
 
-    // Check penilized validator balance
+    // Check penilized validator balance, is should be 10% less than it was before
     let stakedAfter = await protocol.stakeOf(accounts[firstIndex].address, accounts[firstIndex].address);
-    expect(stakedBefore.amount.sub(stakedAfter.amount)).to.equal(stakedBefore.amount.div(ethers.BigNumber.from("10")));
+    const stakeDiff = stakedBefore.amount.sub(stakedAfter.amount);
+    const calculatedPenalty = stakedBefore.amount.div(ethers.BigNumber.from("10"));
+    expect(stakeDiff.amount).to.equal(calculatedPenalty.amount);
 
     // Confirm that process state == COMPLETED
     result = await protocol.getProcess(accounts[5].address, ethers.utils.id('123'));
