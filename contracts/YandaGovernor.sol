@@ -21,7 +21,7 @@ contract YandaGovernor is Governor, GovernorSettings, GovernorCountingRanked, Go
         super.setFunctionRank(bytes(hex'2f2ff15d'), 2);  // grantRole
         super.setFunctionRank(bytes(hex'd547741f'), 2);  // revokeRole
         super.setFunctionRank(bytes(hex'3ac8a356'), 2);  // updateQuorumNumerator
-        super.setFunctionRank(bytes(hex'c0f99d67'), 1);  // addService
+        super.setFunctionRank(bytes(hex'fd09b15f'), 1);  // addService
     }
 
     // The following functions are overrides required by Solidity.

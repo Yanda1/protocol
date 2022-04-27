@@ -12,6 +12,8 @@ contract YandaProtocol is Initializable, AccessControlUpgradeable {
     using SafeMath for uint256;
 
     uint public constant TIME_FRAME_SIZE = 2;
+    uint internal VALIDATORS_PERC;
+    uint internal BROKER_PERC;
     uint internal _penaltyPerc;
     uint internal _lockingPeriod;
     uint256 internal _totalStaked;
@@ -113,6 +115,9 @@ contract YandaProtocol is Initializable, AccessControlUpgradeable {
         _penaltyPerc = penaltyPerc;
         _lockingPeriod = lockingPeriod;
         _tokenContract = IERC20(token);
+
+        VALIDATORS_PERC = 15;
+        BROKER_PERC = 80;
     }
 
     function _containsAddress(address[] memory array, address search) internal pure returns(bool) {
@@ -126,6 +131,11 @@ contract YandaProtocol is Initializable, AccessControlUpgradeable {
 
     function setToken(address token) external onlyRole(DEFAULT_ADMIN_ROLE) {
         _tokenContract = IERC20(token);
+    }
+
+    function setDefaultPerc(uint vPerc, uint bPerc) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        VALIDATORS_PERC = vPerc;
+        BROKER_PERC = bPerc;
     }
 
     function depositToken() external view returns(address) {
@@ -146,11 +156,15 @@ contract YandaProtocol is Initializable, AccessControlUpgradeable {
         }
     }
 
-    function addService(address service, address[] memory vList, uint vPerc, uint cPerc, uint vVer) external onlyRole(DEFAULT_ADMIN_ROLE) {
+    function addService(address service, address[] memory vList) external onlyRole(DEFAULT_ADMIN_ROLE) {
         require(vList.length > 2, "Validators minimum quantity is 3");
-        require(vPerc > 0, "Validators reward share should be major than 0%");
-        require(vPerc + cPerc <= 100, "Sum of validators reward and service comission should be minor or equal to 100%");
-        _services[service] = Service({validators: vList, validationPerc: vPerc, commissionPerc: cPerc, validatorVersion: vVer});
+        _services[service] = Service({validators: vList, validationPerc: VALIDATORS_PERC, commissionPerc: BROKER_PERC, validatorVersion: 1});
+    }
+
+    function setServicePerc(address service, uint vPerc, uint bPerc) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        Service storage instance = _services[service];
+        instance.validationPerc = vPerc;
+        instance.commissionPerc = bPerc;
     }
 
     function setValidators(address[] memory vList) external onlyService {

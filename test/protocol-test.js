@@ -36,7 +36,7 @@ describe("YandaProtocol Test", function () {
     await protocol.deployed();
 
     // Add new service with the admin address of accounts[1] and as validators accounts[2,3,4]
-    await protocol.addService(accounts[1].address, accounts.map(x => x.address).slice(2, 5), 33, 33, 9);
+    await protocol.addService(accounts[1].address, accounts.map(x => x.address).slice(2, 5));
 
     // Transfer 1 YandaToken from token owner to customer account(accounts[5])
     await token.transfer(accounts[5].address, ethers.utils.parseEther('1'));
@@ -142,12 +142,12 @@ describe("YandaProtocol Test", function () {
 
     // Check service balance after receiving service fee
     balance = await token.balanceOf(accounts[1].address);
-    expect(ethers.utils.formatEther(balance)).to.equal('0.33');
+    expect(ethers.utils.formatEther(balance)).to.equal('0.8');
 
     // Check protocol balance
     balance = await token.balanceOf(protocol.address);
     const totalStaked = await protocol.totalStaked();
-    expect(ethers.utils.formatEther(balance.sub(totalStaked))).to.equal('0.34');
+    expect(ethers.utils.formatEther(balance.sub(totalStaked))).to.equal('0.05');
   });
 
   it("Penalize one of the validators", async function () {
@@ -242,7 +242,7 @@ describe("YandaProtocol Test", function () {
 
     // Check service balance after receiving service fee
     balance = await token.balanceOf(accounts[1].address);
-    expect(ethers.utils.formatEther(balance)).to.equal('0.33');
+    expect(ethers.utils.formatEther(balance)).to.equal('0.8');
   });
 
 });

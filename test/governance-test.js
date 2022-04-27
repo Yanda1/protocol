@@ -48,7 +48,7 @@ describe("YandaGovernor Test", function () {
     var votingPower = await token.getVotes(accounts[5].address);
     expect(ethers.utils.formatEther(votingPower)).to.equal('1000.0');
     // Make proposal for adding a new service
-    const transferCalldata = protocol.interface.encodeFunctionData('addService', [accounts[1].address, accounts.map(x => x.address).slice(2, 5), 33, 33, 9]);
+    const transferCalldata = protocol.interface.encodeFunctionData('addService', [accounts[1].address, accounts.map(x => x.address).slice(2, 5)]);
     const newProposalTx = await governor.connect(accounts[5]).propose([protocol.address], [0], [transferCalldata], "Proposal #1: Add new service provider.");
     // Wait until the transaction is mined
     result = await getTxReceipt(newProposalTx);
@@ -88,7 +88,7 @@ describe("YandaGovernor Test", function () {
     const votingPower = await token.getVotes(accounts[5].address);
     expect(ethers.utils.formatEther(votingPower)).to.equal('1000.0');
     // Make proposal for adding a new service
-    const transferCalldata = protocol.interface.encodeFunctionData('addService', [accounts[1].address, accounts.map(x => x.address).slice(2, 5), 33, 33, 9]);
+    const transferCalldata = protocol.interface.encodeFunctionData('addService', [accounts[1].address, accounts.map(x => x.address).slice(2, 5)]);
     const newProposalTx = await governor.connect(accounts[5]).propose([protocol.address], [0], [transferCalldata], "Proposal #1: Add new service provider.");
     // wait until the transaction is mined
     result = await getTxReceipt(newProposalTx);
