@@ -23,11 +23,11 @@ module.exports = {
       chainId: 1281, // (hex: 0x501),
       accounts: privateKeys
     },
-    // moonbase: {
-    //   url: 'https://rpc.api.moonbase.moonbeam.network',
-    //   chainId: 1287, // (hex: 0x507),
-    //   accounts: [process.env.PRIVATE_KEY]
-    // },
+    moonbase: {
+      url: 'https://rpc.api.moonbase.moonbeam.network',
+      chainId: 1287, // (hex: 0x507),
+      accounts: [process.env.PRIVATE_KEY]
+    },
     // moonriver: {
     //   url: 'RPC-API-ENDPOINT-HERE', // Insert your RPC URL here
     //   chainId: 1285, // (hex: 0x505),
