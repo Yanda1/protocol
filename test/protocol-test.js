@@ -27,7 +27,7 @@ describe("YandaProtocol Test", function () {
     // Get all accounts
     accounts = await ethers.getSigners();
     // Deploy YandaToken
-    const Token = await ethers.getContractFactory("YandaTokenV2");
+    const Token = await ethers.getContractFactory("YandaToken");
     token = await upgrades.deployProxy(Token);
     await token.deployed();
     // Deploy YandaProtocol

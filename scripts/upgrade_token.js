@@ -7,12 +7,12 @@ async function main() {
     return;
   }
   console.log("Upgrading at:", DEPLOYED_ADDR);
-  // Upgrade YandaTokenV2
-  const Token = await ethers.getContractFactory("YandaTokenV2");
+  // Upgrade YandaToken
+  const Token = await ethers.getContractFactory("YandaToken");
   const token = await upgrades.upgradeProxy(DEPLOYED_ADDR, Token);
   await token.deployed();
   
-  console.log("YandaTokenV2 successfully upgraded!");
+  console.log("YandaToken successfully upgraded!");
 }
 
 main()

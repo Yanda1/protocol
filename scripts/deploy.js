@@ -2,7 +2,7 @@ const { ethers, upgrades } = require("hardhat");
 
 async function main() {
   // Deploy YandaToken
-  const Token = await ethers.getContractFactory("YandaTokenV2");
+  const Token = await ethers.getContractFactory("YandaToken");
   const token = await upgrades.deployProxy(Token);
   await token.deployed();
   // Protocol contract args: penaltyPerc=10, lockingPeriod=51840 (3 days in 5 sec block's amount)
