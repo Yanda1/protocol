@@ -11,7 +11,7 @@ contract YandaExtendedProtocol is Initializable, AccessControlUpgradeable {
 
     using SafeMath for uint256;
 
-    uint public constant TIME_FRAME_SIZE = 2;
+    uint internal TIME_FRAME_SIZE;
     uint internal VALIDATORS_PERC;
     uint internal BROKER_PERC;
     uint internal FEE_NOMINATOR;
@@ -124,6 +124,7 @@ contract YandaExtendedProtocol is Initializable, AccessControlUpgradeable {
         BROKER_PERC = 80;
         FEE_NOMINATOR = 2;
         FEE_DENOMINATOR = 1000;
+        TIME_FRAME_SIZE = 4;
     }
 
     function _containsAddress(address[] memory array, address search) internal pure returns(bool) {
@@ -133,10 +134,6 @@ contract YandaExtendedProtocol is Initializable, AccessControlUpgradeable {
             }
         }
         return false;
-    }
-
-    function setToken(address token) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        _tokenContract = IERC20(token);
     }
 
     function setDefaultPerc(uint vPerc, uint bPerc) external onlyRole(DEFAULT_ADMIN_ROLE) {
@@ -149,7 +146,15 @@ contract YandaExtendedProtocol is Initializable, AccessControlUpgradeable {
         FEE_DENOMINATOR = denominator;
     }
 
-    function depositToken() external view returns(address) {
+    function setValidationTimeFrame(uint blocks) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        TIME_FRAME_SIZE = blocks;
+    }
+
+    function getValidationTimeFrame() external view returns(uint) {
+        return TIME_FRAME_SIZE;
+    }
+
+    function getStakingTokenAddr() external view returns(address) {
         return address(_tokenContract);
     }
 
