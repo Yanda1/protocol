@@ -2,7 +2,8 @@
  * @type import('hardhat/config').HardhatUserConfig
  */
 require('@openzeppelin/hardhat-upgrades');
-require("@nomiclabs/hardhat-waffle");
+require("@nomiclabs/hardhat-ethers");
+require("@nomiclabs/hardhat-etherscan");
 require('dotenv').config({path: '.env'});
 require('hardhat-contract-sizer');
 
@@ -38,6 +39,6 @@ module.exports = {
     ],
   },
   mocha: {
-    timeout: 100000
-  },
+    timeout: 60000
+  }
 };

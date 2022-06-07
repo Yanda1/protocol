@@ -22,7 +22,7 @@ async function main() {
   /* -------------------------------------------------------------------------------------- */
 
   // Deploy YandaToken
-  const Token = await ethers.getContractFactory("YandaTokenV2", signer);
+  const Token = await ethers.getContractFactory("YandaToken");
   const token = await upgrades.deployProxy(Token);
   await token.deployed();
   console.log('Token deployed')

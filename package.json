@@ -1,11 +1,9 @@
 {
-  "name": "yanda-protocol",
-  "version": "1.0.0",
-  "description": "### Runing on local",
+  "description": "Yanda HyFI protocol for linking DeFi and CeFi.",
   "main": "hardhat.config.js",
-  "directories": {
-    "test": "test"
-  },
+  "keywords": [],
+  "author": "Yanda.io",
+  "license": "GNU GPLv3",
   "scripts": {
     "test": "npx hardhat test"
   },
@@ -13,8 +11,6 @@
     "type": "git",
     "url": "git+https://github.com/Yanda1/protocol.git"
   },
-  "author": "daniel@bmybit.com",
-  "license": "ISC",
   "bugs": {
     "url": "https://github.com/Yanda1/protocol/issues"
   },
