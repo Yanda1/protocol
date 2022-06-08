@@ -1,44 +1,45 @@
 /**
  * @type import('hardhat/config').HardhatUserConfig
  */
+require("@nomiclabs/hardhat-waffle");
 require('@openzeppelin/hardhat-upgrades');
-require("@nomiclabs/hardhat-ethers");
-require("@nomiclabs/hardhat-etherscan");
-require('dotenv').config({path: '.env'});
 require('hardhat-contract-sizer');
+require('dotenv').config({ path: '.env' });
 
-// You need to export an object to set up your config
-// Go to https://hardhat.org/config/ to learn more
-
-/**
- * @type import('hardhat/config').HardhatUserConfig
- */
 module.exports = {
-  defaultNetwork: "mandala_dev",
+  defaultNetwork: "mandala",
   networks: {
-    mandala_dev: {
+    mandala: {
       url: 'http://127.0.0.1:8545',
+      accounts: {
+        mnemonic: process.env.LOCAL_MNEMONIC,
+        path: "m/44'/60'/0'/0",
+      },
+      chainId: 595
+    },
+    mandala_testnet: {
+      url: 'https://tc7-eth.aca-dev.network',
       accounts: {
         mnemonic: process.env.MNEMONIC,
         path: "m/44'/60'/0'/0",
       },
       chainId: 595
-    },
+    }
+  },
+  mocha: {
+    timeout: 100000
   },
   solidity: {
     compilers: [
       {
-        version: "0.8.3",
+        version: "0.8.4",
         settings: {
           optimizer: {
             enabled: true,
-            runs: 1000,
+            runs: 200,
           },
         },
       },
     ],
   },
-  mocha: {
-    timeout: 60000
-  }
 };
