@@ -1,5 +1,6 @@
 const { expect } = require("chai");
 const { ethers, upgrades } = require("hardhat");
+const { EvmRpcProvider } = require("@acala-network/eth-providers");
 const { getTxReceipt } = require("../utils/getTxReceipt");
 
 const PERC_DENOMIDATOR = ethers.BigNumber.from("100")
@@ -30,16 +31,23 @@ describe("YandaExtendedProtocol Test", function () {
   let accounts;
   let token;
   let protocol;
-
+  
   beforeEach(async function () {
     // Get all accounts
     accounts = await ethers.getSigners();
+    // Wrap the provider so we can override fee data.
+    const provider = EvmRpcProvider.from('ws://localhost:9944');
+    await provider.isReady();
+    provider.getFeeData = provider._getEthGas;
+    // Create the signer for the deployment, connected to the provider with custom fee data func
+    const signer = ethers.Wallet.fromMnemonic(process.env.LOCAL_MNEMONIC).connect(provider);
+
     // Deploy YandaToken
-    const Token = await ethers.getContractFactory("YandaToken");
+    const Token = await ethers.getContractFactory("YandaToken", signer);
     token = await upgrades.deployProxy(Token);
     await token.deployed();
     // Deploy YandaProtocol
-    const Protocol = await ethers.getContractFactory("YandaExtendedProtocol");
+    const Protocol = await ethers.getContractFactory("YandaExtendedProtocol", signer);
     protocol = await upgrades.deployProxy(Protocol, [PENALTY_PERC, 51840, token.address]);
     await protocol.deployed();
 
@@ -73,6 +81,8 @@ describe("YandaExtendedProtocol Test", function () {
     await protocol.connect(accounts[4]).stake(accounts[4].address, stakeAmount);
     result = await getTxReceipt(tx);
     console.log('');
+
+    await provider.disconnect();
   });
 
 

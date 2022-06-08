@@ -1,28 +1,22 @@
 const { ethers, upgrades } = require("hardhat");
-const { txParams } = require("../utils/transactionHelpers.js");
 const { EvmRpcProvider } = require("@acala-network/eth-providers");
 
 async function main() {
-  const ethParams = await txParams();
   /* -------------------------------------------------------------------------------------- */
   // https://github.com/OpenZeppelin/openzeppelin-upgrades/issues/85#issuecomment-1028435049
 
   // Wrap the provider so we can override fee data.
-  const provider = EvmRpcProvider.from('ws://localhost:9944');
+  const provider = EvmRpcProvider.from('wss://mandala-tc7-rpcnode.aca-dev.network/ws');
   await provider.isReady();
-
-  provider.getFeeData = async () => ({
-    gasPrice: ethParams.txGasPrice,
-    gasLimit: ethParams.txGasLimit,
-  });
+  provider.getFeeData = provider._getEthGas;
   
-  // Create the signer for the mnemonic, connected to the provider with hardcoded fee data
+  // Create the signer for the deployment, connected to the provider with custom fee data func
   const signer = ethers.Wallet.fromMnemonic(process.env.MNEMONIC).connect(provider);
   
   /* -------------------------------------------------------------------------------------- */
 
   // Deploy YandaToken
-  const Token = await ethers.getContractFactory("YandaToken");
+  const Token = await ethers.getContractFactory("YandaToken", signer);
   const token = await upgrades.deployProxy(Token);
   await token.deployed();
   console.log('Token deployed')
@@ -46,6 +40,8 @@ async function main() {
   console.log("YandaToken deployed at:", token.address);
   console.log("YandaProtocol deployed at:", protocol.address);
   console.log("YandaGovernor deployed at:", governor.address);
+
+  await provider.disconnect();
 }
 
 main()

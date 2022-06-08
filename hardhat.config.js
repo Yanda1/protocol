@@ -17,14 +17,6 @@ module.exports = {
       },
       chainId: 595
     },
-    mandala_testnet: {
-      url: 'https://tc7-eth.aca-dev.network',
-      accounts: {
-        mnemonic: process.env.MNEMONIC,
-        path: "m/44'/60'/0'/0",
-      },
-      chainId: 595
-    }
   },
   mocha: {
     timeout: 100000

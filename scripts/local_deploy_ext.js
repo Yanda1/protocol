@@ -1,14 +1,23 @@
 const { ethers, upgrades } = require("hardhat");
 const { getTxReceipt } = require("../utils/getTxReceipt");
+const { EvmRpcProvider } = require("@acala-network/eth-providers");
 
 async function main() {
-    accounts = await ethers.getSigners();
+    const accounts = await ethers.getSigners();
+    // Wrap the provider so we can override fee data.
+    const provider = EvmRpcProvider.from('ws://localhost:9944');
+    await provider.isReady();
+    provider.getFeeData = provider._getEthGas;
+
+    // Create the signer for the deployment, connected to the provider with custom fee data func
+    const signer = ethers.Wallet.fromMnemonic(process.env.LOCAL_MNEMONIC).connect(provider);
+
     // Deploy YandaToken
-    const Token = await ethers.getContractFactory("YandaToken");
+    const Token = await ethers.getContractFactory("YandaToken", signer);
     token = await upgrades.deployProxy(Token);
     await token.deployed();
     // Deploy YandaProtocol
-    const Protocol = await ethers.getContractFactory("YandaExtendedProtocol");
+    const Protocol = await ethers.getContractFactory("YandaExtendedProtocol", signer);
     protocol = await upgrades.deployProxy(Protocol, [10, 50, token.address]);
     await protocol.deployed();
 
@@ -44,6 +53,8 @@ async function main() {
     // Stake 30 YandaToken from the third validator(accounts[4])
     await protocol.connect(accounts[4]).stake(accounts[4].address, stakeAmount);
     result = await getTxReceipt(tx);
+
+    await provider.disconnect();
 }
 
 main()
