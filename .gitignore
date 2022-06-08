@@ -6,4 +6,6 @@ cache/
 .env
 
 _*
-*-lock.json
+
+package-lock.json
+yarn.lock
