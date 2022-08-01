@@ -26,6 +26,8 @@ contract YandaExtendedProtocol is Initializable, AccessControlUpgradeable {
         State state;
         uint256 cost;
         uint256 costConf;
+        address payable deposit;
+        address payable depositConf;
         uint256 fee;
         address service;
         bytes32 productId;
@@ -38,7 +40,6 @@ contract YandaExtendedProtocol is Initializable, AccessControlUpgradeable {
         bool secondResult;
     }
     struct Service {
-        address payable deposit;
         address[] validators;
         uint validationPerc;
         uint commissionPerc;
@@ -163,28 +164,23 @@ contract YandaExtendedProtocol is Initializable, AccessControlUpgradeable {
         Process storage process = _processes[sender][_depositingProducts[sender]];
         require(process.state == State.AWAITING_TRANSFER, "You don't have a deposit awaiting process, please create it first");
         require(process.cost == msg.value, "Deposit amount doesn't match with the requested deposit");
-        Service storage service = _services[process.service];
         // Transfer main payment from customer to the broker(subtracting the fee)
-        service.deposit.transfer(msg.value.sub(process.fee));
+        process.deposit.transfer(msg.value.sub(process.fee));
 
         // Update process state and emit an event
         process.state = State.AWAITING_TERMINATION;
         emit Deposit(sender, process.service, process.productId, msg.value);
     }
 
-    function addService(address service, address payable depositAddr, address[] memory vList) external onlyRole(DEFAULT_ADMIN_ROLE) {
+    function addService(address service, address[] memory vList) external onlyRole(DEFAULT_ADMIN_ROLE) {
         require(vList.length > 2, "Validators minimum quantity is 3");
-        _services[service] = Service({deposit: depositAddr, validators: vList, validationPerc: VALIDATORS_PERC, commissionPerc: BROKER_PERC, validatorVersion: 1});
+        _services[service] = Service({validators: vList, validationPerc: VALIDATORS_PERC, commissionPerc: BROKER_PERC, validatorVersion: 1});
     }
 
     function setServicePerc(address service, uint vPerc, uint bPerc) external onlyRole(DEFAULT_ADMIN_ROLE) {
         Service storage instance = _services[service];
         instance.validationPerc = vPerc;
         instance.commissionPerc = bPerc;
-    }
-
-    function setDepositAddr(address payable depositAddr) external onlyService {
-        _services[msg.sender].deposit = depositAddr;
     }
 
     function setValidators(address[] memory vList) external onlyService {
@@ -267,7 +263,7 @@ contract YandaExtendedProtocol is Initializable, AccessControlUpgradeable {
         require(_services[service].validationPerc > 0, 'Requested service address not found');
         require(_processes[msg.sender][productId].service == address(0), 'Process with specified productId already exist');
 
-        _processes[msg.sender][productId] = Process({state: State.AWAITING_COST,cost: 0,costConf: 0,fee: 0,service: service,productId: productId,productData: data,startBlock: block.number,validatorsList: _randValidatorsList(service, address(0), address(0)),firstValidator: address(0),firstResult: false,secondValidator: address(0),secondResult: false});
+        _processes[msg.sender][productId] = Process({state: State.AWAITING_COST,cost: 0,costConf: 0, deposit: payable(address(0)), depositConf: payable(address(0)), fee: 0,service: service,productId: productId,productData: data,startBlock: block.number,validatorsList: _randValidatorsList(service, address(0), address(0)),firstValidator: address(0),firstResult: false,secondValidator: address(0),secondResult: false});
         emit CostRequest(msg.sender, service, productId, _processes[msg.sender][productId].validatorsList, data);
 
         if(_depositingProducts[msg.sender].length > 0) {
@@ -351,7 +347,7 @@ contract YandaExtendedProtocol is Initializable, AccessControlUpgradeable {
         return transfersSum;
     }
 
-    function setProcessCost(address customer, bytes32 productId, uint256 cost) external {
+    function setProcessCost(address customer, bytes32 productId, uint256 cost, address payable deposit) external {
         require(_stakesByValidators[msg.sender] > 0, "Only validator with stakes can call this method");
         Process storage process = _processes[customer][productId];
         require(_containsAddress(_services[process.service].validators, msg.sender), "Your address is not whitelisted in the product service settings");
@@ -369,13 +365,15 @@ contract YandaExtendedProtocol is Initializable, AccessControlUpgradeable {
         if(process.firstValidator == address(0)) {
             process.firstValidator = msg.sender;
             process.cost = cost;
+            process.deposit = deposit;
             process.startBlock = block.number;
             process.validatorsList = _randValidatorsList(process.service, process.firstValidator, address(0));
             emit CostRequest(customer, process.service, productId, process.validatorsList, process.productData);
         } else if(process.secondValidator == address(0)) {
             process.secondValidator = msg.sender;
             process.costConf = cost;
-            if(process.cost == process.costConf) {
+            process.depositConf = deposit;
+            if(process.cost == process.costConf && process.deposit == process.depositConf) {
                 process.fee = cost.mul(FEE_NOMINATOR).div(FEE_DENOMINATOR);
                 process.state = State.AWAITING_TRANSFER;
                 emit CostResponse(customer, process.service, productId, cost);
@@ -385,12 +383,14 @@ contract YandaExtendedProtocol is Initializable, AccessControlUpgradeable {
                 emit CostRequest(customer, process.service, productId, process.validatorsList, process.productData);
             }
         } else {
-            if(process.cost == cost) {
+            if(process.cost == cost && process.deposit == deposit) {
                 process.secondValidator = msg.sender;
                 process.costConf = cost;
+                process.depositConf = deposit;
             } else {
                 process.firstValidator = msg.sender;
                 process.cost = cost;
+                process.deposit = deposit;
             }
             process.cost = cost;
             process.fee = cost.mul(FEE_NOMINATOR).div(FEE_DENOMINATOR);
