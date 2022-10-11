@@ -44,7 +44,7 @@ describe("YandaExtendedProtocol Test", function () {
     await protocol.deployed();
 
     // Add new service with the admin address of accounts[1] and as validators accounts[2,3,4]
-    await protocol.addService(accounts[1].address, accounts[6].address, accounts.map(x => x.address).slice(2, 5));
+    await protocol.addService(accounts[1].address, accounts.map(x => x.address).slice(2, 5));
 
     // Transfer 10 YandaToken from token owner to the first validator(accounts[2])
     await token.transfer(accounts[2].address, ethers.utils.parseEther('10'));
@@ -90,7 +90,7 @@ describe("YandaExtendedProtocol Test", function () {
     
     console.log(`Selected validator accounts[${firstIndex}]`)
     // First process cost setup
-    let setCostTx = await protocol.connect(accounts[firstIndex]).setProcessCost(accounts[5].address, ethers.utils.id('123'), ethers.utils.parseEther('1'));
+    let setCostTx = await protocol.connect(accounts[firstIndex]).setProcessCost(accounts[5].address, ethers.utils.id('123'), ethers.utils.parseEther('1'), accounts[6].address);
     console.log('Calulated cost is 1 ETH')
 
     // Retreive validators rand list from the logs
@@ -99,7 +99,7 @@ describe("YandaExtendedProtocol Test", function () {
 
     console.log(`Selected validator accounts[${secondIndex}]`)
     // Second(confirmation) process cost setup
-    await protocol.connect(accounts[secondIndex]).setProcessCost(accounts[5].address, ethers.utils.id('123'), ethers.utils.parseEther('1'));
+    await protocol.connect(accounts[secondIndex]).setProcessCost(accounts[5].address, ethers.utils.id('123'), ethers.utils.parseEther('1'), accounts[6].address);
     console.log('Calulated cost is 1 ETH')
 
     const constracBalanceBefore = await ethers.provider.getBalance(protocol.address);
@@ -174,7 +174,7 @@ describe("YandaExtendedProtocol Test", function () {
     
     console.log(`Selected validator accounts[${firstIndex}]`)
     // First process cost setup
-    let setCostTx = await protocol.connect(accounts[firstIndex]).setProcessCost(accounts[5].address, ethers.utils.id('123'), ethers.utils.parseEther('2'));
+    let setCostTx = await protocol.connect(accounts[firstIndex]).setProcessCost(accounts[5].address, ethers.utils.id('123'), ethers.utils.parseEther('2'), accounts[6].address);
     console.log('Calulated cost is 2 ETH')
 
     // Retreive validators rand list from the logs
@@ -183,7 +183,7 @@ describe("YandaExtendedProtocol Test", function () {
 
     console.log(`Selected validator accounts[${secondIndex}]`)
     // Second(confirmation) process cost setup
-    setCostTx = await protocol.connect(accounts[secondIndex]).setProcessCost(accounts[5].address, ethers.utils.id('123'), ethers.utils.parseEther('1'));
+    setCostTx = await protocol.connect(accounts[secondIndex]).setProcessCost(accounts[5].address, ethers.utils.id('123'), ethers.utils.parseEther('1'), accounts[6].address);
     console.log('Calulated cost is 1 ETH')
     
     // Retreive validators rand list from the logs
@@ -192,7 +192,7 @@ describe("YandaExtendedProtocol Test", function () {
 
     console.log(`Selected validator accounts[${thirdIndex}]`)
     // Third(confirmation) process cost setup
-    await protocol.connect(accounts[thirdIndex]).setProcessCost(accounts[5].address, ethers.utils.id('123'), ethers.utils.parseEther('1'));
+    await protocol.connect(accounts[thirdIndex]).setProcessCost(accounts[5].address, ethers.utils.id('123'), ethers.utils.parseEther('1'), accounts[6].address);
     console.log('Calulated cost is 1 ETH')
 
     const constracBalanceBefore = await ethers.provider.getBalance(protocol.address);
