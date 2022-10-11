@@ -24,6 +24,7 @@
     "@openzeppelin/contracts-upgradeable": "^4.4.1",
     "dotenv": "^11.0.0",
     "hardhat-contract-sizer": "^2.4.0",
+    "hardhat-storage-layout": "^0.1.7",
     "solidity-bytes-utils": "^0.8.0"
   }
 }

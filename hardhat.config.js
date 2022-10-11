@@ -4,8 +4,10 @@
 require('@openzeppelin/hardhat-upgrades');
 require("@nomiclabs/hardhat-ethers");
 require("@nomiclabs/hardhat-etherscan");
+// utils
 require('dotenv').config({path: '.env'});
 require('hardhat-contract-sizer');
+require('hardhat-storage-layout');
 
 // You need to export an object to set up your config
 // Go to https://hardhat.org/config/ to learn more
@@ -71,6 +73,6 @@ module.exports = {
     ],
   },
   mocha: {
-    timeout: 60000
+    timeout: 120000
   }
 };
