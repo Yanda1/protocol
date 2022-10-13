@@ -359,6 +359,8 @@ contract YandaExtendedProtocolV3 is AccessControl{
             _stakes[staker][validator].amount = _stakes[staker][validator].amount - transferAmount;
             transfersSum += transferAmount;
         }
+        // Subtract penalty from the validator total stakes amount
+        _stakesByValidators[validator] -= transfersSum;
         
         return transfersSum;
     }
@@ -449,24 +451,29 @@ contract YandaExtendedProtocolV3 is AccessControl{
             "Cannot accept validation, you are out of time"
         );
 
+        // If we don't have first validator response yet
         if(process.firstValidator == address(0)) {
             process.firstValidator = msg.sender;
             process.firstResult = result;
             process.startBlock = block.number;
             process.validatorsList = _randValidatorsList(process.service, process.firstValidator, address(0));
             emit Terminate(customer, process.service, productId, process.validatorsList);
+        // If we have first validator response but not the second one
         } else if(process.secondValidator == address(0)) {
             process.secondValidator = msg.sender;
             process.secondResult = result;
+            // If the first and second validator results match
             if(process.firstResult == process.secondResult) {
                 _makePayouts(customer, productId, !process.firstResult, 0);
                 process.state = State.COMPLETED;
                 emit Complete(customer, process.service, productId, process.firstResult);
+            // If the first and second validator results do not match
             } else {
                 process.startBlock = block.number;
                 process.validatorsList = _randValidatorsList(process.service, process.firstValidator, process.secondValidator);
                 emit Terminate(customer, process.service, productId, process.validatorsList);
             }
+        // If we have received the third validator response
         } else {
             if(process.firstResult == result) {
                 uint256 penalty = _stakesByValidators[process.secondValidator].mul(_penaltyPerc).div(100);
