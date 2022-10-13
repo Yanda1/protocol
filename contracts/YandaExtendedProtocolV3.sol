@@ -541,6 +541,10 @@ contract YandaExtendedProtocolV3 is AccessControl{
         return _stakes[staker][validator];
     }
 
+    function totalStakeOf(address validator) external view returns (uint256) {
+        return _stakesByValidators[validator];
+    }
+
     function totalStaked() external view returns (uint256) {
         return _totalStaked;
     }
