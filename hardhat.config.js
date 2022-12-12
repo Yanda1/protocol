@@ -8,6 +8,7 @@ require("@nomiclabs/hardhat-etherscan");
 require('dotenv').config({path: '.env'});
 require('hardhat-contract-sizer');
 require('hardhat-storage-layout');
+require("hardhat-gas-reporter");
 
 // You need to export an object to set up your config
 // Go to https://hardhat.org/config/ to learn more
@@ -44,7 +45,21 @@ module.exports = {
     moonbeam: {
       url: 'https://rpc.api.moonbeam.network',
       chainId: 1284, // (hex: 0x504),
-      accounts: [process.env.PRIVATE_KEY, process.env.V1_PRIVATE_KEY, process.env.V2_PRIVATE_KEY, process.env.V3_PRIVATE_KEY]
+      accounts: [process.env.PRIVATE_KEY, process.env.SERVICE_PRIVATE_KEY, process.env.CLIENT_PRIVATE_KEY, process.env.V1_PRIVATE_KEY, process.env.V2_PRIVATE_KEY, process.env.V3_PRIVATE_KEY]
+    },
+    goerli: {
+      url: 'https://eth-goerli.public.blastapi.io',
+      chainId: 5,
+      networkCheckTimeout: 999999,
+      timeoutBlocks: 600,
+      accounts: [process.env.PRIVATE_KEY, process.env.SERVICE_PRIVATE_KEY, process.env.CLIENT_PRIVATE_KEY, process.env.V1_PRIVATE_KEY, process.env.V2_PRIVATE_KEY, process.env.V3_PRIVATE_KEY]
+    },
+    ethereum: {
+      url: 'https://ethereum.publicnode.com',
+      chainId: 1,
+      networkCheckTimeout: 999999,
+      timeoutBlocks: 600,
+      accounts: [process.env.PRIVATE_KEY, process.env.SERVICE_PRIVATE_KEY, process.env.CLIENT_PRIVATE_KEY, process.env.V1_PRIVATE_KEY, process.env.V2_PRIVATE_KEY, process.env.V3_PRIVATE_KEY]
     }
   },
   etherscan: {
@@ -57,7 +72,7 @@ module.exports = {
         settings: {
           optimizer: {
             enabled: true,
-            runs: 1000,
+            runs: 200,
           },
         },
       },
@@ -66,13 +81,13 @@ module.exports = {
         settings: {
           optimizer: {
             enabled: true,
-            runs: 1000,
+            runs: 200,
           },
         },
       },
     ],
   },
   mocha: {
-    timeout: 120000
+    timeout: 100000000
   }
 };
