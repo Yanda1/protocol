@@ -9,7 +9,7 @@ import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 
 
 /// @custom:security-contact mariostumpo@bmybit.com
-contract YandaTokenV2 is Initializable, ERC20Upgradeable, AccessControlUpgradeable, ERC20PermitUpgradeable, ERC20VotesUpgradeable {
+contract YandaToken is Initializable, ERC20Upgradeable, AccessControlUpgradeable, ERC20PermitUpgradeable, ERC20VotesUpgradeable {
 
     bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
 
@@ -17,9 +17,9 @@ contract YandaTokenV2 is Initializable, ERC20Upgradeable, AccessControlUpgradeab
     constructor() initializer {}
 
     function initialize() initializer public {
-        __ERC20_init("YandaTokenV2", "YND");
+        __ERC20_init("YandaTokenTest", "YNDT");
         __AccessControl_init();
-        __ERC20Permit_init("YandaTokenV2");
+        __ERC20Permit_init("YandaTokenTest");
         _mint(msg.sender, 1000000000 * 10 ** decimals());
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
         _grantRole(MINTER_ROLE, msg.sender);

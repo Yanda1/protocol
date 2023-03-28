@@ -6,3 +6,4 @@ cache/
 .env
 
 _*
+*-lock.json

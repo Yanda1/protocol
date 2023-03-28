@@ -1,32 +1,36 @@
 // SPDX-License-Identifier: GNU GPLv3
 pragma solidity ^0.8.3;
 
-import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import "@openzeppelin/contracts/access/AccessControl.sol";
 import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 
-contract YandaProtocol is Initializable, AccessControlUpgradeable {
+contract YandaExtendedProtocolV3 is AccessControl{
 
     using SafeMath for uint256;
 
-    uint public constant TIME_FRAME_SIZE = 2;
+    uint internal TIME_FRAME_SIZE;
     uint internal VALIDATORS_PERC;
     uint internal BROKER_PERC;
+    uint internal FEE_NOMINATOR;
+    uint internal FEE_DENOMINATOR;
     uint internal _penaltyPerc;
     uint internal _lockingPeriod;
     uint256 internal _totalStaked;
     IERC20 internal _tokenContract;
+    address payable internal _beneficiary;
 
     enum State { AWAITING_COST, AWAITING_TRANSFER, AWAITING_TERMINATION, AWAITING_VALIDATION, COMPLETED }
     struct Process {
         State state;
         uint256 cost;
         uint256 costConf;
+        address payable deposit;
+        address payable depositConf;
+        uint256 fee;
         address service;
         bytes32 productId;
-        string productData;
         uint256 startBlock;
         address[] validatorsList;
         address firstValidator;
@@ -105,12 +109,9 @@ contract YandaProtocol is Initializable, AccessControlUpgradeable {
         _;
     }
 
-    /// @custom:oz-upgrades-unsafe-allow constructor
-    constructor() initializer {}
-
-    function initialize(uint penaltyPerc, uint lockingPeriod, address token) initializer public {
-        __AccessControl_init();
+    constructor(uint penaltyPerc, uint lockingPeriod, address token) {
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
+        _beneficiary = payable(msg.sender);
 
         _penaltyPerc = penaltyPerc;
         _lockingPeriod = lockingPeriod;
@@ -118,6 +119,9 @@ contract YandaProtocol is Initializable, AccessControlUpgradeable {
 
         VALIDATORS_PERC = 15;
         BROKER_PERC = 80;
+        FEE_NOMINATOR = 2;
+        FEE_DENOMINATOR = 1000;
+        TIME_FRAME_SIZE = 4;
     }
 
     function _containsAddress(address[] memory array, address search) internal pure returns(bool) {
@@ -129,8 +133,8 @@ contract YandaProtocol is Initializable, AccessControlUpgradeable {
         return false;
     }
 
-    function setToken(address token) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        _tokenContract = IERC20(token);
+    function setBeneficiary(address payable newAddr) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        _beneficiary = newAddr;
     }
 
     function setDefaultPerc(uint vPerc, uint bPerc) external onlyRole(DEFAULT_ADMIN_ROLE) {
@@ -138,22 +142,34 @@ contract YandaProtocol is Initializable, AccessControlUpgradeable {
         BROKER_PERC = bPerc;
     }
 
-    function depositToken() external view returns(address) {
+    function setProtocolFee(uint nominator, uint denominator) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        FEE_NOMINATOR = nominator;
+        FEE_DENOMINATOR = denominator;
+    }
+
+    function setValidationTimeFrame(uint blocks) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        TIME_FRAME_SIZE = blocks;
+    }
+
+    function getValidationTimeFrame() external view returns(uint) {
+        return TIME_FRAME_SIZE;
+    }
+
+    function getStakingTokenAddr() external view returns(address) {
         return address(_tokenContract);
     }
 
-    function deposit(uint256 amount) external {
-        Process storage process = _processes[msg.sender][_depositingProducts[msg.sender]];
+    receive() external payable {
+        address sender = _msgSender();
+        Process storage process = _processes[sender][_depositingProducts[sender]];
         require(process.state == State.AWAITING_TRANSFER, "You don't have a deposit awaiting process, please create it first");
-        require(process.cost == amount, "Deposit amount doesn't match with the requested cost");
+        require(process.cost == msg.value, "Deposit amount doesn't match with the requested deposit");
+        // Transfer main payment from customer to the broker(subtracting the fee)
+        process.deposit.transfer(msg.value.sub(process.fee));
 
-        bool success = _tokenContract.transferFrom(_msgSender(), address(this), amount);
-        if(success) {
-            process.state = State.AWAITING_TERMINATION;
-            emit Deposit(_msgSender(), process.service, process.productId, amount);
-        } else {
-            revert("Wasn't able to transfer your token");
-        }
+        // Update process state and emit an event
+        process.state = State.AWAITING_TERMINATION;
+        emit Deposit(sender, process.service, process.productId, msg.value);
     }
 
     function addService(address service, address[] memory vList) external onlyRole(DEFAULT_ADMIN_ROLE) {
@@ -243,11 +259,26 @@ contract YandaProtocol is Initializable, AccessControlUpgradeable {
         return result;
     }
 
-    function createProcess(address service, bytes32 productId, string memory data) public {
+    function createProcess(address service, bytes32 productId, string calldata data) public {
         require(_services[service].validationPerc > 0, 'Requested service address not found');
         require(_processes[msg.sender][productId].service == address(0), 'Process with specified productId already exist');
 
-        _processes[msg.sender][productId] = Process({state: State.AWAITING_COST,cost: 0,costConf: 0,service: service,productId: productId,productData: data,startBlock: block.number,validatorsList: _randValidatorsList(service, address(0), address(0)),firstValidator: address(0),firstResult: false,secondValidator: address(0),secondResult: false});
+        _processes[msg.sender][productId] = Process({
+            state: State.AWAITING_COST,
+            cost: 0,
+            costConf: 0,
+            deposit: payable(address(0)),
+            depositConf: payable(address(0)),
+            fee: 0,
+            service: service,
+            productId: productId,
+            startBlock: block.number,
+            validatorsList: _randValidatorsList(service, address(0), address(0)),
+            firstValidator: address(0),
+            firstResult: false,
+            secondValidator: address(0),
+            secondResult: false
+        });
         emit CostRequest(msg.sender, service, productId, _processes[msg.sender][productId].validatorsList, data);
 
         if(_depositingProducts[msg.sender].length > 0) {
@@ -258,12 +289,26 @@ contract YandaProtocol is Initializable, AccessControlUpgradeable {
         _depositingProducts[msg.sender] = productId;
     }
 
-    function _rewardingLoop(address validator, uint256 reward) internal returns(uint256) {
+    function _rewardLoop(address validator, uint256 reward) internal returns(uint256) {
         uint256 transfersSum = 0;
         for (uint256 i = 0; i < _validatorStakers[validator].length; i++) {
             address staker = _validatorStakers[validator][i];
-        
+            // Calc reward share according to the staked amount
             uint256 transferAmount = reward.mul(_stakes[staker][validator].amount.mul(100).div(_stakesByValidators[validator])).div(100);
+            // Transfer reward to the staker
+            payable(staker).transfer(transferAmount);
+            transfersSum += transferAmount;
+        }
+        return transfersSum;
+    }
+
+    function _bonusLoop(address validator, uint256 bonus) internal returns(uint256) {
+        uint256 transfersSum = 0;
+        for (uint256 i = 0; i < _validatorStakers[validator].length; i++) {
+            address staker = _validatorStakers[validator][i];
+            // Calc bonus share according to the staked amount
+            uint256 transferAmount = bonus.mul(_stakes[staker][validator].amount.mul(100).div(_stakesByValidators[validator])).div(100);
+            // Increase stake with bonus
             _stakes[staker][validator].amount = _stakes[staker][validator].amount.add(transferAmount);
             transfersSum += transferAmount;
         }
@@ -273,27 +318,36 @@ contract YandaProtocol is Initializable, AccessControlUpgradeable {
     function _rewardStakers(address firstValidator, address secondValidator, uint256 rewardAmount) internal returns(uint256) {
         uint256 firstReward = rewardAmount.mul(_stakesByValidators[firstValidator].mul(100).div(_stakesByValidators[firstValidator].add(_stakesByValidators[secondValidator]))).div(100);
         uint256 secondReward = rewardAmount - firstReward;
-        uint256 firstTransfersSum = _rewardingLoop(firstValidator, firstReward);
-        uint256 secondTransfersSum = _rewardingLoop(secondValidator, secondReward);
-        _stakesByValidators[firstValidator] = _stakesByValidators[firstValidator].add(firstTransfersSum);
-        _stakesByValidators[secondValidator] = _stakesByValidators[secondValidator].add(secondTransfersSum);
+        uint256 firstRewardTsSum = _rewardLoop(firstValidator, firstReward);
+        uint256 secondRewardTsSum = _rewardLoop(secondValidator, secondReward);
 
-        return firstTransfersSum + secondTransfersSum;
+        return firstRewardTsSum + secondRewardTsSum;
+    }
+
+    function _rewardBonus(address firstValidator, address secondValidator, uint256 bonus) internal {
+        uint256 firstBonus = bonus.mul(_stakesByValidators[firstValidator].mul(100).div(_stakesByValidators[firstValidator].add(_stakesByValidators[secondValidator]))).div(100);
+        uint256 secondBonus = bonus - firstBonus;
+        uint256 firstBonusTsSum = _bonusLoop(firstValidator, firstBonus);
+        uint256 secondBonusTsSum = _bonusLoop(secondValidator, secondBonus);
+
+        _stakesByValidators[firstValidator] += firstBonusTsSum;
+        _stakesByValidators[secondValidator] += secondBonusTsSum;
     }
 
     function _makePayouts(address customer, bytes32 productId, bool needRefund, uint256 bonus) internal {
-        uint256 reward_amount = (_processes[customer][productId].cost.mul(_services[_processes[customer][productId].service].validationPerc)).div(100);
-        uint256 transfers_sum = _rewardStakers(_processes[customer][productId].firstValidator, _processes[customer][productId].secondValidator, reward_amount.add(bonus));
-        _totalStaked = _totalStaked.add(transfers_sum);
-        transfers_sum -= bonus;
+        Process storage process = _processes[customer][productId];
+        uint256 reward_amount = process.fee.mul(_services[process.service].validationPerc).div(100);
+        uint256 transfers_sum = _rewardStakers(process.firstValidator, process.secondValidator, reward_amount);
+        if(bonus > 0) {
+            _rewardBonus(process.firstValidator, process.secondValidator, bonus);
+        }
 
         if(needRefund == false) {
-            uint256 commission_amount = (_processes[customer][productId].cost.mul(_services[_processes[customer][productId].service].commissionPerc)).div(100);
-            _tokenContract.transfer(payable(_processes[customer][productId].service), commission_amount);
-            // TODO
-            // _burn(address(this), _processes[customer][productId].cost - transfers_sum - commission_amount);
+            uint256 commission_amount = process.fee.mul(_services[process.service].commissionPerc).div(100);
+            payable(process.service).transfer(commission_amount);
+            _beneficiary.transfer(process.fee - transfers_sum - commission_amount);
         } else {
-            _tokenContract.transfer(payable(customer), _processes[customer][productId].cost - transfers_sum);
+            payable(customer).transfer(process.fee - transfers_sum);
         }
     }
 
@@ -305,11 +359,13 @@ contract YandaProtocol is Initializable, AccessControlUpgradeable {
             _stakes[staker][validator].amount = _stakes[staker][validator].amount - transferAmount;
             transfersSum += transferAmount;
         }
+        // Subtract penalty from the validator total stakes amount
+        _stakesByValidators[validator] -= transfersSum;
         
         return transfersSum;
     }
 
-    function setProcessCost(address customer, bytes32 productId, uint256 cost) external {
+    function setProcessCost(address customer, bytes32 productId, uint256 cost, address payable deposit) external {
         require(_stakesByValidators[msg.sender] > 0, "Only validator with stakes can call this method");
         Process storage process = _processes[customer][productId];
         require(_containsAddress(_services[process.service].validators, msg.sender), "Your address is not whitelisted in the product service settings");
@@ -327,29 +383,35 @@ contract YandaProtocol is Initializable, AccessControlUpgradeable {
         if(process.firstValidator == address(0)) {
             process.firstValidator = msg.sender;
             process.cost = cost;
+            process.deposit = deposit;
             process.startBlock = block.number;
             process.validatorsList = _randValidatorsList(process.service, process.firstValidator, address(0));
-            emit CostRequest(customer, process.service, productId, process.validatorsList, process.productData);
+            emit CostRequest(customer, process.service, productId, process.validatorsList, '');
         } else if(process.secondValidator == address(0)) {
             process.secondValidator = msg.sender;
             process.costConf = cost;
-            if(process.cost == process.costConf) {
+            process.depositConf = deposit;
+            if(process.cost == process.costConf && process.deposit == process.depositConf) {
+                process.fee = cost.mul(FEE_NOMINATOR).div(FEE_DENOMINATOR);
                 process.state = State.AWAITING_TRANSFER;
                 emit CostResponse(customer, process.service, productId, cost);
             } else {
                 process.startBlock = block.number;
                 process.validatorsList = _randValidatorsList(process.service, process.firstValidator, process.secondValidator);
-                emit CostRequest(customer, process.service, productId, process.validatorsList, process.productData);
+                emit CostRequest(customer, process.service, productId, process.validatorsList, '');
             }
         } else {
-            if(process.cost == cost) {
+            if(process.cost == cost && process.deposit == deposit) {
                 process.secondValidator = msg.sender;
                 process.costConf = cost;
+                process.depositConf = deposit;
             } else {
                 process.firstValidator = msg.sender;
                 process.cost = cost;
+                process.deposit = deposit;
             }
             process.cost = cost;
+            process.fee = cost.mul(FEE_NOMINATOR).div(FEE_DENOMINATOR);
             process.state = State.AWAITING_TRANSFER;
             emit CostResponse(customer, process.service, productId, cost);
         }
@@ -389,24 +451,29 @@ contract YandaProtocol is Initializable, AccessControlUpgradeable {
             "Cannot accept validation, you are out of time"
         );
 
+        // If we don't have first validator response yet
         if(process.firstValidator == address(0)) {
             process.firstValidator = msg.sender;
             process.firstResult = result;
             process.startBlock = block.number;
             process.validatorsList = _randValidatorsList(process.service, process.firstValidator, address(0));
             emit Terminate(customer, process.service, productId, process.validatorsList);
+        // If we have first validator response but not the second one
         } else if(process.secondValidator == address(0)) {
             process.secondValidator = msg.sender;
             process.secondResult = result;
+            // If the first and second validator results match
             if(process.firstResult == process.secondResult) {
                 _makePayouts(customer, productId, !process.firstResult, 0);
                 process.state = State.COMPLETED;
                 emit Complete(customer, process.service, productId, process.firstResult);
+            // If the first and second validator results do not match
             } else {
                 process.startBlock = block.number;
                 process.validatorsList = _randValidatorsList(process.service, process.firstValidator, process.secondValidator);
                 emit Terminate(customer, process.service, productId, process.validatorsList);
             }
+        // If we have received the third validator response
         } else {
             if(process.firstResult == result) {
                 uint256 penalty = _stakesByValidators[process.secondValidator].mul(_penaltyPerc).div(100);
@@ -472,6 +539,10 @@ contract YandaProtocol is Initializable, AccessControlUpgradeable {
 
     function stakeOf(address staker, address validator) external view returns (Stake memory) {
         return _stakes[staker][validator];
+    }
+
+    function totalStakeOf(address validator) external view returns (uint256) {
+        return _stakesByValidators[validator];
     }
 
     function totalStaked() external view returns (uint256) {

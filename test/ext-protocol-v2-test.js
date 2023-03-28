@@ -2,6 +2,14 @@ const { expect } = require("chai");
 const { ethers, upgrades } = require("hardhat");
 const { getTxReceipt } = require("../utils/getTxReceipt");
 
+const PERC_DENOMIDATOR = ethers.BigNumber.from("100")
+const VALIDATORS_PERC = ethers.BigNumber.from("15");
+const BROKER_PERC = ethers.BigNumber.from("80");
+const PROTOCOL_PERC = PERC_DENOMIDATOR.sub(VALIDATORS_PERC).sub(BROKER_PERC);
+const FEE_NOMINATOR = ethers.BigNumber.from("2");
+const FEE_DENOMINATOR = ethers.BigNumber.from("1000");
+const PENALTY_PERC = 10;
+
 
 async function getValidatorFromTx(contract, tx) {
   const receipt = await getTxReceipt(tx);
@@ -18,7 +26,7 @@ function getValidatorIndex(accounts, selectedAddr) {
   }
 }
 
-describe("YandaProtocol Test", function () {
+describe("YandaExtendedProtocol Test", function () {
   let accounts;
   let token;
   let protocol;
@@ -30,16 +38,14 @@ describe("YandaProtocol Test", function () {
     const Token = await ethers.getContractFactory("YandaToken");
     token = await upgrades.deployProxy(Token);
     await token.deployed();
-    // Deploy YandaProtocol
-    const Protocol = await ethers.getContractFactory("YandaProtocol");
-    protocol = await upgrades.deployProxy(Protocol, [10, 51840, token.address]);
+    // Deploy YandaProtocol V2
+    const Protocol = await ethers.getContractFactory("YandaExtendedProtocolV2");
+    protocol = await Protocol.deploy(PENALTY_PERC, 51840, token.address);
     await protocol.deployed();
 
     // Add new service with the admin address of accounts[1] and as validators accounts[2,3,4]
     await protocol.addService(accounts[1].address, accounts.map(x => x.address).slice(2, 5));
 
-    // Transfer 1 YandaToken from token owner to customer account(accounts[5])
-    await token.transfer(accounts[5].address, ethers.utils.parseEther('1'));
     // Transfer 10 YandaToken from token owner to the first validator(accounts[2])
     await token.transfer(accounts[2].address, ethers.utils.parseEther('10'));
     // Transfer 20 YandaToken from token owner to the second validator(accounts[3])
@@ -47,7 +53,7 @@ describe("YandaProtocol Test", function () {
     // Transfer 30 YandaToken from token owner to the third validator(accounts[4])
     await token.transfer(accounts[4].address, ethers.utils.parseEther('30'));
 
-    var stakeAmount = ethers.utils.parseEther('10');
+    var stakeAmount = ethers.utils.parseEther('10'); 
     var tx = await token.connect(accounts[2]).approve(protocol.address, stakeAmount);
     // Wait until the transaction is mined
     var result = await getTxReceipt(tx);
@@ -71,50 +77,54 @@ describe("YandaProtocol Test", function () {
 
 
   it("Create new service and product, declare actions and terminate", async function () {
-    // Confirm account #5 balance is equal to 1 YND
-    let balance = await token.balanceOf(accounts[5].address);
-    expect(ethers.utils.formatEther(balance)).to.equal('1.0');
+    // Confirm account #5 balance is greater than 1 ETH
+    let balance = await ethers.provider.getBalance(accounts[5].address);
+    expect(Number(ethers.utils.formatEther(balance))).to.gt(Number('1'));
 
     // Create process for account #5, cost amount is 1 YandaToken, product id: 123 and data is {"a": 1, "b": 2, "c": 3}
     const newProcessTx = await protocol.connect(accounts[5]).createProcess(accounts[1].address, ethers.utils.id('123'), '{"a": 1, "b": 2, "c": 3}');
 
     // Retreive validators rand list from the logs
-    var selectedValidator = await getValidatorFromTx(protocol, newProcessTx);
-    var firstIndex = getValidatorIndex(accounts, selectedValidator);
+    let selectedValidator = await getValidatorFromTx(protocol, newProcessTx);
+    let firstIndex = getValidatorIndex(accounts, selectedValidator);
     
     console.log(`Selected validator accounts[${firstIndex}]`)
     // First process cost setup
-    var setCostTx = await protocol.connect(accounts[firstIndex]).setProcessCost(accounts[5].address, ethers.utils.id('123'), ethers.utils.parseEther('1'));
-    console.log('Calulated cost is 1 YND')
+    let setCostTx = await protocol.connect(accounts[firstIndex]).setProcessCost(accounts[5].address, ethers.utils.id('123'), ethers.utils.parseEther('1'), accounts[6].address);
+    console.log('Calulated cost is 1 ETH')
 
     // Retreive validators rand list from the logs
     selectedValidator = await getValidatorFromTx(protocol, setCostTx);
-    var secondIndex = getValidatorIndex(accounts, selectedValidator);
+    let secondIndex = getValidatorIndex(accounts, selectedValidator);
 
     console.log(`Selected validator accounts[${secondIndex}]`)
     // Second(confirmation) process cost setup
-    await protocol.connect(accounts[secondIndex]).setProcessCost(accounts[5].address, ethers.utils.id('123'), ethers.utils.parseEther('1'));
-    console.log('Calulated cost is 1 YND')
+    await protocol.connect(accounts[secondIndex]).setProcessCost(accounts[5].address, ethers.utils.id('123'), ethers.utils.parseEther('1'), accounts[6].address);
+    console.log('Calulated cost is 1 ETH')
 
-    const balanceBefore = await token.balanceOf(protocol.address);
-    
+    const constracBalanceBefore = await ethers.provider.getBalance(protocol.address);
+    const serviceBalanceBefore = await ethers.provider.getBalance(accounts[5].address);
+    const depositBalanceBefore = await ethers.provider.getBalance(accounts[6].address);
+
     // Make smart contract deposit from account #5
-    const depositAmount = ethers.utils.parseEther('1');
-    tx = await token.connect(accounts[5]).approve(protocol.address, depositAmount);
-    result = await getTxReceipt(tx);
-    tx = await protocol.connect(accounts[5]).deposit(depositAmount);
-    result = await getTxReceipt(tx);
+    const depositAmount = ethers.BigNumber.from(ethers.utils.parseEther('1'));
+    let tx = await accounts[5].sendTransaction({to: protocol.address, value: depositAmount});
+    await tx.wait();
 
-    // Check contract balance
-    const balanceAfter = await token.balanceOf(protocol.address);
-    expect(ethers.utils.formatEther(balanceAfter.sub(balanceBefore))).to.equal('1.0');
+    // Check contract native asset balance after the deposit (0.002 if deposit equals to 1 ETH)
+    const contractBalanceAfter = await ethers.provider.getBalance(protocol.address);
+    expect(contractBalanceAfter.sub(constracBalanceBefore).amount).to.equal(depositAmount.mul(FEE_NOMINATOR).div(FEE_DENOMINATOR).amount);
+
+    // Check service provider native asset balance after the deposit but before fee distribution (0.998 if deposit equals to 1 ETH)
+    const depositBalanceAfter = await ethers.provider.getBalance(accounts[6].address);
+    expect(depositBalanceAfter.sub(depositBalanceBefore).amount).to.equal(depositAmount.mul(FEE_DENOMINATOR.sub(FEE_NOMINATOR)).div(FEE_DENOMINATOR).amount);
 
     // Declare few service produced actions
     await protocol.connect(accounts[1]).declareAction(accounts[5].address, ethers.utils.id('123'), 'First order data');
     await protocol.connect(accounts[1]).declareAction(accounts[5].address, ethers.utils.id('123'), 'Second order data');
 
-    // Customer driven termination process starting for the productId '123'
-    const terminateTx = await protocol.connect(accounts[5]).startTermination(accounts[5].address, ethers.utils.id('123'));
+    // Broker driven termination process starting for the productId '123'
+    const terminateTx = await protocol.connect(accounts[1]).startTermination(accounts[5].address, ethers.utils.id('123'));
 
     // Retreive validators rand list from the logs
     selectedValidator = await getValidatorFromTx(protocol, terminateTx);
@@ -134,63 +144,73 @@ describe("YandaProtocol Test", function () {
     tx = await protocol.connect(accounts[secondIndex]).validateTermination(accounts[5].address, ethers.utils.id('123'), true);
     console.log('Validated with "true"');
     // Confirm that transaction was minted
-    var result = await getTxReceipt(tx);
+    let result = await getTxReceipt(tx);
 
     // Confirm that process state == COMPLETED
     result = await protocol.getProcess(accounts[5].address, ethers.utils.id('123'));
     expect(result.state).to.equal(4);
 
     // Check service balance after receiving service fee
-    balance = await token.balanceOf(accounts[1].address);
-    expect(ethers.utils.formatEther(balance)).to.equal('0.8');
+    const serviceBalanceAfter = await ethers.provider.getBalance(accounts[5].address);
+    expect(serviceBalanceAfter.sub(serviceBalanceBefore).amount).to.equal(depositAmount.mul(BROKER_PERC).div(PERC_DENOMIDATOR).amount);
 
     // Check protocol balance
-    balance = await token.balanceOf(protocol.address);
-    const totalStaked = await protocol.totalStaked();
-    expect(ethers.utils.formatEther(balance.sub(totalStaked))).to.equal('0.05');
+    balance = await await ethers.provider.getBalance(protocol.address);
+    expect(balance.amount).to.equal(depositAmount.mul(PROTOCOL_PERC).div(PERC_DENOMIDATOR).amount);
+
   });
 
   it("Penalize one of the validators", async function () {
-    // Confirm account #5 balance is equal to 1 YND
-    let balance = await token.balanceOf(accounts[5].address);
-    expect(ethers.utils.formatEther(balance)).to.equal('1.0');
+    // Confirm account #5 balance is greater than 1 ETH
+    let balance = await ethers.provider.getBalance(accounts[5].address);
+    expect(Number(ethers.utils.formatEther(balance))).to.gt(Number('1'));
 
     // Create process for account #5, cost amount is 1 YandaToken, product id: 123 and data is {"a": 1, "b": 2, "c": 3}
     const newProcessTx = await protocol.connect(accounts[5]).createProcess(accounts[1].address, ethers.utils.id('123'), '{"a": 1, "b": 2, "c": 3}');
 
     // Retreive validators rand list from the logs
-    var selectedValidator = await getValidatorFromTx(protocol, newProcessTx);
-    var firstIndex = getValidatorIndex(accounts, selectedValidator);
+    let selectedValidator = await getValidatorFromTx(protocol, newProcessTx);
+    let firstIndex = getValidatorIndex(accounts, selectedValidator);
     
     console.log(`Selected validator accounts[${firstIndex}]`)
     // First process cost setup
-    var setCostTx = await protocol.connect(accounts[firstIndex]).setProcessCost(accounts[5].address, ethers.utils.id('123'), ethers.utils.parseEther('2'));
-    console.log('Calulated cost is 2 YND')
+    let setCostTx = await protocol.connect(accounts[firstIndex]).setProcessCost(accounts[5].address, ethers.utils.id('123'), ethers.utils.parseEther('2'), accounts[6].address);
+    console.log('Calulated cost is 2 ETH')
 
     // Retreive validators rand list from the logs
     selectedValidator = await getValidatorFromTx(protocol, setCostTx);
-    var secondIndex = getValidatorIndex(accounts, selectedValidator);
+    let secondIndex = getValidatorIndex(accounts, selectedValidator);
 
     console.log(`Selected validator accounts[${secondIndex}]`)
     // Second(confirmation) process cost setup
-    setCostTx = await protocol.connect(accounts[secondIndex]).setProcessCost(accounts[5].address, ethers.utils.id('123'), ethers.utils.parseEther('1'));
-    console.log('Calulated cost is 1 YND')
-
+    setCostTx = await protocol.connect(accounts[secondIndex]).setProcessCost(accounts[5].address, ethers.utils.id('123'), ethers.utils.parseEther('1'), accounts[6].address);
+    console.log('Calulated cost is 1 ETH')
+    
     // Retreive validators rand list from the logs
     selectedValidator = await getValidatorFromTx(protocol, setCostTx);
-    var thirdIndex = getValidatorIndex(accounts, selectedValidator);
+    let thirdIndex = getValidatorIndex(accounts, selectedValidator);
 
     console.log(`Selected validator accounts[${thirdIndex}]`)
     // Third(confirmation) process cost setup
-    await protocol.connect(accounts[thirdIndex]).setProcessCost(accounts[5].address, ethers.utils.id('123'), ethers.utils.parseEther('1'));
-    console.log('Calulated cost is 1 YND')
-    
+    await protocol.connect(accounts[thirdIndex]).setProcessCost(accounts[5].address, ethers.utils.id('123'), ethers.utils.parseEther('1'), accounts[6].address);
+    console.log('Calulated cost is 1 ETH')
+
+    const constracBalanceBefore = await ethers.provider.getBalance(protocol.address);
+    const serviceBalanceBefore = await ethers.provider.getBalance(accounts[5].address);
+    const depositBalanceBefore = await ethers.provider.getBalance(accounts[6].address);
+
     // Make smart contract deposit from account #5
-    const depositAmount = ethers.utils.parseEther('1');
-    var tx = await token.connect(accounts[5]).approve(protocol.address, depositAmount);
-    // Wait until the transaction is mined
-    var result = await getTxReceipt(tx);
-    await protocol.connect(accounts[5]).deposit(depositAmount);
+    const depositAmount = ethers.BigNumber.from(ethers.utils.parseEther('1'));
+    let tx = await accounts[5].sendTransaction({to: protocol.address, value: depositAmount});
+    await tx.wait();
+
+    // Check contract native asset balance after the deposit (0.002 if deposit equals to 1 ETH)
+    const contractBalanceAfter = await ethers.provider.getBalance(protocol.address);
+    expect(contractBalanceAfter.sub(constracBalanceBefore).amount).to.equal(depositAmount.mul(FEE_NOMINATOR).div(FEE_DENOMINATOR).amount);
+
+    // Check service provider native asset balance after the deposit but before fee distribution (0.998 if deposit equals to 1 ETH)
+    const depositBalanceAfter = await ethers.provider.getBalance(accounts[6].address);
+    expect(depositBalanceAfter.sub(depositBalanceBefore).amount).to.equal(depositAmount.mul(FEE_DENOMINATOR.sub(FEE_NOMINATOR)).div(FEE_DENOMINATOR).amount);
 
     // Declare few service produced actions
     await protocol.connect(accounts[1]).declareAction(accounts[5].address, ethers.utils.id('123'), 'First order data');
@@ -207,8 +227,8 @@ describe("YandaProtocol Test", function () {
 
     console.log(`Selected validator accounts[${firstIndex}]`)
     // First validation of the productId "123" for client accounts[5]
-    var validateTerminationTx = await protocol.connect(accounts[firstIndex]).validateTermination(accounts[5].address, ethers.utils.id('123'), false);
-    console.log('Validated with false');
+    let validateTerminationTx = await protocol.connect(accounts[firstIndex]).validateTermination(accounts[5].address, ethers.utils.id('123'), false);
+    console.log('Validated with "false"');
 
     // Retreive validators rand list from the logs
     selectedValidator = await getValidatorFromTx(protocol, validateTerminationTx);
@@ -233,7 +253,7 @@ describe("YandaProtocol Test", function () {
     // Check penilized validator balance, is should be 10% less than it was before
     let stakedAfter = await protocol.stakeOf(accounts[firstIndex].address, accounts[firstIndex].address);
     const stakeDiff = stakedBefore.amount.sub(stakedAfter.amount);
-    const calculatedPenalty = stakedBefore.amount.div(ethers.BigNumber.from("10"));
+    const calculatedPenalty = stakedBefore.amount.mul(ethers.BigNumber.from(PENALTY_PERC)).div(PERC_DENOMIDATOR);
     expect(stakeDiff.amount).to.equal(calculatedPenalty.amount);
 
     // Confirm that process state == COMPLETED
@@ -241,8 +261,13 @@ describe("YandaProtocol Test", function () {
     expect(result.state).to.equal(4);
 
     // Check service balance after receiving service fee
-    balance = await token.balanceOf(accounts[1].address);
-    expect(ethers.utils.formatEther(balance)).to.equal('0.8');
+    const serviceBalanceAfter = await ethers.provider.getBalance(accounts[5].address);
+    expect(serviceBalanceAfter.sub(serviceBalanceBefore).amount).to.equal(depositAmount.mul(BROKER_PERC).div(PERC_DENOMIDATOR).amount);
+
+    // Check protocol balance
+    balance = await await ethers.provider.getBalance(protocol.address);
+    expect(balance.amount).to.equal(depositAmount.mul(PROTOCOL_PERC).div(PERC_DENOMIDATOR).amount);
+
   });
 
 });

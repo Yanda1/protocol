@@ -1,14 +1,14 @@
 {
-  "name": "contract",
+  "name": "yanda-protocol",
   "version": "1.0.0",
-  "description": "### Runing on local",
-  "main": "index.js",
+  "description": "Yanda HyFI protocol for linking DeFi and CeFi.",
+  "main": "",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "npx hardhat test"
   },
   "keywords": [],
-  "author": "",
-  "license": "ISC",
+  "author": "Yanda.io",
+  "license": "GNU GPLv3",
   "devDependencies": {
     "@nomiclabs/hardhat-ethers": "^2.0.3",
     "@nomiclabs/hardhat-waffle": "^2.0.1",
@@ -16,14 +16,16 @@
     "@openzeppelin/hardhat-upgrades": "^1.12.1",
     "chai": "^4.3.4",
     "ethereum-waffle": "^3.4.0",
-    "ethers": "^5.5.2",
-    "hardhat": "^2.7.0"
+    "ethers": "^5.6.8",
+    "hardhat": "^2.7.0",
+    "hardhat-gas-reporter": "^1.0.9"
   },
   "dependencies": {
-    "@celo/contracts": "^0.0.8",
+    "@nomiclabs/hardhat-etherscan": "^3.0.3",
     "@openzeppelin/contracts-upgradeable": "^4.4.1",
     "dotenv": "^11.0.0",
     "hardhat-contract-sizer": "^2.4.0",
+    "hardhat-storage-layout": "^0.1.7",
     "solidity-bytes-utils": "^0.8.0"
   }
 }
