@@ -45,7 +45,7 @@ module.exports = {
     moonbeam: {
       url: 'https://rpc.api.moonbeam.network',
       chainId: 1284, // (hex: 0x504),
-      accounts: [process.env.PRIVATE_KEY, process.env.SERVICE_PRIVATE_KEY, process.env.CLIENT_PRIVATE_KEY, process.env.V1_PRIVATE_KEY, process.env.V2_PRIVATE_KEY, process.env.V3_PRIVATE_KEY]
+      accounts: [process.env.PRIVATE_KEY, process.env.SERVICE_PRIVATE_KEY, process.env.CLIENT_PRIVATE_KEY, process.env.V1_PRIVATE_KEY, process.env.V2_PRIVATE_KEY, process.env.V3_PRIVATE_KEY, process.env.V4_PRIVATE_KEY, process.env.V5_PRIVATE_KEY, process.env.V6_PRIVATE_KEY, process.env.V7_PRIVATE_KEY]
     },
     goerli: {
       url: 'https://eth-goerli.public.blastapi.io',
@@ -59,7 +59,7 @@ module.exports = {
       chainId: 1,
       networkCheckTimeout: 999999,
       timeoutBlocks: 600,
-      accounts: [process.env.PRIVATE_KEY, process.env.SERVICE_PRIVATE_KEY, process.env.CLIENT_PRIVATE_KEY, process.env.V1_PRIVATE_KEY, process.env.V2_PRIVATE_KEY, process.env.V3_PRIVATE_KEY]
+      accounts: [process.env.PRIVATE_KEY, process.env.SERVICE_PRIVATE_KEY, process.env.CLIENT_PRIVATE_KEY, process.env.V1_PRIVATE_KEY, process.env.V2_PRIVATE_KEY, process.env.V3_PRIVATE_KEY, process.env.V4_PRIVATE_KEY, process.env.V5_PRIVATE_KEY, process.env.V6_PRIVATE_KEY, process.env.V7_PRIVATE_KEY]
     }
   },
   etherscan: {
