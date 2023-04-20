@@ -47,9 +47,9 @@ module.exports = {
       chainId: 1284, // (hex: 0x504),
       accounts: [process.env.PRIVATE_KEY, process.env.SERVICE_PRIVATE_KEY, process.env.CLIENT_PRIVATE_KEY, process.env.V1_PRIVATE_KEY, process.env.V2_PRIVATE_KEY, process.env.V3_PRIVATE_KEY, process.env.V4_PRIVATE_KEY, process.env.V5_PRIVATE_KEY, process.env.V6_PRIVATE_KEY, process.env.V7_PRIVATE_KEY]
     },
-    goerli: {
-      url: 'https://eth-goerli.public.blastapi.io',
-      chainId: 5,
+    sepolia: {
+      url: 'https://ethereum-sepolia.blockpi.network/v1/rpc/public',
+      chainId: 11155111,
       networkCheckTimeout: 999999,
       timeoutBlocks: 600,
       accounts: [process.env.PRIVATE_KEY, process.env.SERVICE_PRIVATE_KEY, process.env.CLIENT_PRIVATE_KEY, process.env.V1_PRIVATE_KEY, process.env.V2_PRIVATE_KEY, process.env.V3_PRIVATE_KEY]
@@ -60,7 +60,21 @@ module.exports = {
       networkCheckTimeout: 999999,
       timeoutBlocks: 600,
       accounts: [process.env.PRIVATE_KEY, process.env.SERVICE_PRIVATE_KEY, process.env.CLIENT_PRIVATE_KEY, process.env.V1_PRIVATE_KEY, process.env.V2_PRIVATE_KEY, process.env.V3_PRIVATE_KEY, process.env.V4_PRIVATE_KEY, process.env.V5_PRIVATE_KEY, process.env.V6_PRIVATE_KEY, process.env.V7_PRIVATE_KEY]
-    }
+    },
+    bsc: {
+      url: 'https://bsc.publicnode.com',
+      chainId: 56,
+      networkCheckTimeout: 999999,
+      timeoutBlocks: 600,
+      accounts: [process.env.PRIVATE_KEY, process.env.SERVICE_PRIVATE_KEY, process.env.CLIENT_PRIVATE_KEY, process.env.V1_PRIVATE_KEY, process.env.V2_PRIVATE_KEY, process.env.V3_PRIVATE_KEY, process.env.V4_PRIVATE_KEY, process.env.V5_PRIVATE_KEY, process.env.V6_PRIVATE_KEY, process.env.V7_PRIVATE_KEY]
+    },
+    bsc_testnet: {
+      url: 'https://data-seed-prebsc-1-s1.binance.org:8545',
+      chainId: 97,
+      networkCheckTimeout: 999999,
+      timeoutBlocks: 600,
+      accounts: [process.env.PRIVATE_KEY, process.env.SERVICE_PRIVATE_KEY, process.env.CLIENT_PRIVATE_KEY, process.env.V1_PRIVATE_KEY, process.env.V2_PRIVATE_KEY, process.env.V3_PRIVATE_KEY, process.env.V4_PRIVATE_KEY, process.env.V5_PRIVATE_KEY, process.env.V6_PRIVATE_KEY, process.env.V7_PRIVATE_KEY]
+    },
   },
   etherscan: {
     apiKey: process.env.ETHERSCAN_KEY
